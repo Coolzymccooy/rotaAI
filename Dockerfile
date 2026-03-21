@@ -19,7 +19,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
@@ -27,14 +27,14 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma/schema.postgresql.prisma prisma/schema.prisma
 COPY prisma/seed.ts prisma/seed.ts
 COPY server ./server
-
-# Install tsx for seed script
-RUN npm install tsx
+COPY tsconfig.json ./
+COPY vite.config.ts ./
+COPY index.html ./
+COPY src ./src
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
 
-# Run prisma db push + seed on first boot, then start
-CMD sh -c "npx prisma db push --skip-generate && node dist/server/index.js"
+CMD ["sh", "-c", "npx prisma db push --skip-generate || true && npx tsx server/index.ts"]
