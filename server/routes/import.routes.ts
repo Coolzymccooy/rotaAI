@@ -13,6 +13,7 @@ router.use(authorize('admin'));
 router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { doctors, leaveRequests, doctorPreferences, historicalLoad, shiftTemplates, serviceRequirements } = req.body;
+    const orgId = req.user?.organizationId || null;
     const results: Record<string, { imported: number; skipped: number; errors: string[] }> = {};
 
     // 1. Import doctors first (other tables reference doctor IDs)
@@ -25,6 +26,7 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
           if (!name) { results.doctors.skipped++; continue; }
 
           const docData = {
+            organizationId: orgId,
             gmcNumber: doc.gmc_number || null,
             title: doc.title || null,
             name,
@@ -186,6 +188,7 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
       for (const st of shiftTemplates) {
         try {
           const stData = {
+            organizationId: orgId,
             shiftType: st.shift_type,
             startTime: st.start_time,
             endTime: st.end_time,
@@ -218,6 +221,7 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
         try {
           await prisma.serviceRequirement.create({
             data: {
+              organizationId: orgId,
               site: sr.site,
               specialty: sr.specialty,
               department: sr.department,

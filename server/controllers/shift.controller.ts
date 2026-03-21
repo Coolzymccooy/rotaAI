@@ -4,7 +4,7 @@ import * as auditService from '../services/audit.service.js';
 
 export const getShifts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const shifts = await shiftService.getAllShifts();
+    const shifts = await shiftService.getAllShifts(req.user?.organizationId);
     res.status(200).json({ success: true, data: shifts });
   } catch (error) {
     next(error);
@@ -25,7 +25,7 @@ export const getShift = async (req: Request, res: Response, next: NextFunction) 
 
 export const createShift = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const shift = await shiftService.createShift(req.body);
+    const shift = await shiftService.createShift({ ...req.body, organizationId: req.user?.organizationId });
     await auditService.log({
       userId: req.user?.id,
       action: 'CREATE',

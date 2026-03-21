@@ -5,7 +5,7 @@ import * as auditService from '../services/audit.service.js';
 export const generateRota = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { startDate, endDate, rules } = req.body;
-    const result = await rotaService.generateRota(startDate, endDate, rules);
+    const result = await rotaService.generateRota(startDate, endDate, rules, req.user?.organizationId);
     await auditService.log({
       userId: req.user?.id,
       action: 'GENERATE_ROTA',

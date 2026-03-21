@@ -2,13 +2,17 @@ import { prisma } from '../config/db.js';
 import { callOptimizationEngine } from './python.service.js';
 import { logger } from '../config/logger.js';
 
-export const generateRota = async (startDate: string, endDate: string, rules: any) => {
-  // 1. Fetch all doctors and existing shifts
-  const doctors = await prisma.doctor.findMany({ include: { leaves: true } });
-  const existingShifts = await prisma.shift.findMany();
+export const generateRota = async (startDate: string, endDate: string, rules: any, organizationId?: string) => {
+  // Scope queries by organization
+  const where: any = {};
+  if (organizationId) where.organizationId = organizationId;
 
-  // 2. Fetch active rules
-  const activeRules = await prisma.rule.findMany({ where: { isActive: true } });
+  // 1. Fetch doctors and existing shifts scoped to org
+  const doctors = await prisma.doctor.findMany({ where, include: { leaves: true } });
+  const existingShifts = await prisma.shift.findMany({ where });
+
+  // 2. Fetch active rules scoped to org
+  const activeRules = await prisma.rule.findMany({ where: { ...where, isActive: true } });
 
   // 3. Call optimization engine (Python or fallback)
   const payload = {
@@ -38,11 +42,11 @@ export const generateRota = async (startDate: string, endDate: string, rules: an
     constraints: rules || {},
   };
 
-  logger.info('Generating rota via optimization engine...');
+  logger.info(`Generating rota for ${doctors.length} doctors (org: ${organizationId || 'all'})...`);
   const result = await callOptimizationEngine(payload);
 
-  // 4. Clear existing shifts
-  await prisma.shift.deleteMany();
+  // 4. Clear existing shifts for this org
+  await prisma.shift.deleteMany({ where });
 
   // 5. Save the new shifts
   const assignments = result.assignments || [];
@@ -51,6 +55,7 @@ export const generateRota = async (startDate: string, endDate: string, rules: an
   for (const shift of assignments) {
     const created = await prisma.shift.create({
       data: {
+        organizationId: organizationId || null,
         doctorId: shift.doctorId,
         dayIdx: shift.dayIdx,
         type: shift.type,
@@ -62,7 +67,7 @@ export const generateRota = async (startDate: string, endDate: string, rules: an
     createdShifts.push(created);
   }
 
-  logger.info(`Rota generated: ${createdShifts.length} shifts created`, {
+  logger.info(`Rota generated: ${createdShifts.length} shifts`, {
     fairnessScore: result.fairness_score,
     coverageScore: result.coverage_score,
   });
