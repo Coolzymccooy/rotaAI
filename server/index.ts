@@ -1,7 +1,6 @@
 import express from 'express';
 import http from 'http';
 import net from 'net';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import app from './app.js';
 import { logger } from './config/logger.js';
@@ -46,13 +45,18 @@ async function startServer() {
   // Initialize Socket.IO
   initSocket(httpServer);
 
-  // Vite middleware for development
+  // Vite middleware for development (dynamic import to avoid crash in prod)
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      logger.warn('Vite not available, serving static files');
+    }
   } else {
     // Serve static files in production
     const distPath = path.join(process.cwd(), 'dist');
