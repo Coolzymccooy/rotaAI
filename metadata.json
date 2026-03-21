@@ -1,0 +1,5 @@
+{
+  "name": "RotaAI",
+  "description": "AI-powered medical rostering system designed for NHS-style hospital environments.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Using SQLite for the sandbox environment. 
+// To switch to PostgreSQL, change provider to "postgresql"
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Doctor {
+  id           String       @id @default(uuid())
+  name         String
+  grade        String       // e.g., "FY1", "SHO", "Registrar", "Consultant"
+  department   String       @default("A&E")
+  contract     String       // e.g., "100%", "80%"
+  fte          String       @default("1.0")
+  status       String       @default("Active")
+  karma        Int          @default(0)
+  fatigue      String       @default("Low")
+  maxHours     Float        @default(48.0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  shifts       Shift[]
+  leaves       Leave[]
+}
+
+model Shift {
+  id           String       @id @default(uuid())
+  doctorId     String
+  dayIdx       Int
+  type         String       // e.g., "Day", "Night", "Weekend"
+  time         String       // e.g., "08:00 - 20:00"
+  isLocum      Boolean      @default(false)
+  violation    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  doctor       Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model Leave {
+  id        String   @id @default(uuid())
+  doctorId  String
+  type      String   // e.g., "annual", "study", "sick"
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model Rule {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  isActive    Boolean  @default(true)
+  category    String   @default("General")
+  severity    String   @default("Hard") // "Hard" or "Soft"
+  value       String?  // Optional value, e.g., "48" for max hours
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
