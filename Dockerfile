@@ -35,4 +35,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push 2>&1; echo 'DB migrated. Starting server...'; exec ./node_modules/.bin/tsx server/index.ts"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss 2>&1; echo 'DB migrated. Starting server...'; exec ./node_modules/.bin/tsx server/index.ts"]
