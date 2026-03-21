@@ -37,4 +37,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate || true && npx tsx server/index.ts"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate 2>&1 || true; echo 'Starting server...'; exec npx tsx server/index.ts 2>&1"]
