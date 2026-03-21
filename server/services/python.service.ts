@@ -4,7 +4,7 @@ const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8
 
 export const callOptimizationEngine = async (payload: any) => {
   try {
-    logger.info('Calling Python Optimization Service...');
+    logger.warn(`Calling Python Optimization Service at ${PYTHON_SERVICE_URL}...`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
