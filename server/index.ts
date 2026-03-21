@@ -1,12 +1,51 @@
 import express from 'express';
+import http from 'http';
+import net from 'net';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import app from './app.js';
 import { logger } from './config/logger.js';
+import { initSocket } from './config/socket.js';
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PREFERRED_PORT = parseInt(process.env.PORT || '3000', 10);
+const MAX_PORT_ATTEMPTS = 20;
+
+function isPortAvailable(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, host);
+  });
+}
+
+async function findAvailablePort(startPort: number, host: string): Promise<number> {
+  for (let port = startPort; port < startPort + MAX_PORT_ATTEMPTS; port++) {
+    if (await isPortAvailable(port, host)) {
+      return port;
+    }
+    logger.warn(`Port ${port} is in use, trying ${port + 1}...`);
+  }
+  throw new Error(`No available port found between ${startPort} and ${startPort + MAX_PORT_ATTEMPTS - 1}`);
+}
 
 async function startServer() {
+  const HOST = '0.0.0.0';
+
+  // Find an available port
+  const PORT = await findAvailablePort(PREFERRED_PORT, HOST);
+  if (PORT !== PREFERRED_PORT) {
+    logger.warn(`Port ${PREFERRED_PORT} was unavailable. Using port ${PORT} instead.`);
+  }
+
+  // Create HTTP server
+  const httpServer = http.createServer(app);
+
+  // Initialize Socket.IO
+  initSocket(httpServer);
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -23,9 +62,10 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, HOST, () => {
     logger.info(`Server running on http://localhost:${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Socket.IO enabled`);
   });
 }
 

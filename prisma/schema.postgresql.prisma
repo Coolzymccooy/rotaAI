@@ -1,0 +1,137 @@
+// PostgreSQL version of the schema
+// To migrate:
+// 1. Run `docker-compose up -d postgres`
+// 2. Update .env: DATABASE_URL="postgresql://rotaai:rotaai_dev_password@localhost:5432/rotaai"
+// 3. Copy this file over schema.prisma
+// 4. Run `npx prisma db push`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("doctor")
+  doctorId  String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor    Doctor?  @relation(fields: [doctorId], references: [id])
+  auditLogs AuditLog[]
+}
+
+model Doctor {
+  id           String       @id @default(uuid())
+  name         String
+  grade        String
+  department   String       @default("A&E")
+  contract     String
+  fte          String       @default("1.0")
+  status       String       @default("Active")
+  karma        Int          @default(0)
+  fatigue      String       @default("Low")
+  maxHours     Float        @default(48.0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  shifts       Shift[]
+  leaves       Leave[]
+  user         User?
+  swapsFrom    ShiftSwap[]  @relation("SwapRequester")
+  swapsTo      ShiftSwap[]  @relation("SwapTarget")
+  leaveRequests LeaveRequest[]
+}
+
+model Shift {
+  id           String       @id @default(uuid())
+  doctorId     String
+  dayIdx       Int
+  type         String
+  time         String
+  date         String?
+  isLocum      Boolean      @default(false)
+  violation    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  doctor       Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  swaps        ShiftSwap[]
+}
+
+model Leave {
+  id        String   @id @default(uuid())
+  doctorId  String
+  type      String
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model LeaveRequest {
+  id        String   @id @default(uuid())
+  doctorId  String
+  type      String
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  status    String   @default("pending")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model ShiftSwap {
+  id              String   @id @default(uuid())
+  shiftId         String
+  requesterId     String
+  targetDoctorId  String
+  targetDayIdx    Int
+  reason          String?
+  status          String   @default("pending")
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shift           Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  requester       Doctor   @relation("SwapRequester", fields: [requesterId], references: [id])
+  targetDoctor    Doctor   @relation("SwapTarget", fields: [targetDoctorId], references: [id])
+}
+
+model Rule {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  isActive    Boolean  @default(true)
+  category    String   @default("General")
+  severity    String   @default("Hard")
+  value       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  details     String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+}

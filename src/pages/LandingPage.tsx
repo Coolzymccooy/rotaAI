@@ -2,8 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Stethoscope, CalendarDays, Map as MapIcon, ShieldCheck, Zap, ArrowRight, Activity, Users } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export function LandingPage() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
       {/* Navigation */}
@@ -14,15 +18,27 @@ export function LandingPage() {
             <span>RotaAI</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/app" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Sign In
-            </Link>
-            <Link 
-              to="/app" 
-              className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2"
-            >
-              Launch App
-            </Link>
+            <ThemeToggle />
+            {user ? (
+              <Link
+                to="/app"
+                className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -31,10 +47,10 @@ export function LandingPage() {
       <section className="relative pt-24 pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:32px_32px]" />
         <div className="absolute inset-0 flex items-center justify-center bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-        
+
         <div className="container mx-auto px-4 relative z-10 max-w-7xl">
           <div className="text-center max-w-3xl mx-auto space-y-8">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
@@ -43,8 +59,8 @@ export function LandingPage() {
               <SparklesIcon className="w-4 h-4 mr-2" />
               The Future of Clinical Workforce Management
             </motion.div>
-            
-            <motion.h1 
+
+            <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
@@ -55,8 +71,8 @@ export function LandingPage() {
                 Zero Violations.
               </span>
             </motion.h1>
-            
-            <motion.p 
+
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
@@ -64,23 +80,23 @@ export function LandingPage() {
             >
               RotaAI uses advanced generative AI to automatically build EWTD-compliant medical schedules, optimize locum spend, and balance ward acuity in real-time.
             </motion.p>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
             >
-              <Link 
-                to="/app" 
-                className="inline-flex items-center justify-center rounded-full text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-8 w-full sm:w-auto group"
+              <Link
+                to={user ? '/app' : '/register'}
+                className="inline-flex items-center justify-center rounded-full text-base font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-8 w-full sm:w-auto group"
               >
-                Launch App
+                {user ? 'Go to Dashboard' : 'Get Started Free'}
                 <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <a 
-                href="#features" 
-                className="inline-flex items-center justify-center rounded-full text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-12 px-8 w-full sm:w-auto"
+              <a
+                href="#features"
+                className="inline-flex items-center justify-center rounded-full text-base font-medium transition-colors border border-input hover:bg-accent hover:text-accent-foreground h-12 px-8 w-full sm:w-auto"
               >
                 Explore Features
               </a>
@@ -98,34 +114,34 @@ export function LandingPage() {
               Replace manual spreadsheets with an intelligent system that understands clinical constraints, staff preferences, and patient acuity.
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <FeatureCard 
+            <FeatureCard
               icon={<Zap className="w-6 h-6 text-amber-500" />}
               title="AI Rota Generation"
               description="Generate complete, compliant schedules in seconds using our advanced optimization engine. Just type a prompt and watch the magic happen."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<ShieldCheck className="w-6 h-6 text-emerald-500" />}
               title="EWTD Compliance"
               description="Never worry about European Working Time Directive violations again. The system automatically enforces rest periods and maximum hours."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<Activity className="w-6 h-6 text-blue-500" />}
               title="Live Acuity Map"
               description="Monitor patient load vs. staffing levels across all wards in real-time. Auto-balance staff to critical areas instantly."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<CalendarDays className="w-6 h-6 text-indigo-500" />}
-              title="Smart Rota Board"
-              description="An intuitive, drag-and-drop interface for managing shifts, with real-time validation and AI-powered swap suggestions."
+              title="Drag & Drop Rota Board"
+              description="An intuitive, drag-and-drop interface for managing shifts with Day/Week/Month calendar views and real-time validation."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<Users className="w-6 h-6 text-purple-500" />}
               title="Workforce Management"
-              description="Track doctor fatigue, karma scores, and leave requests. Keep your team happy and prevent burnout before it happens."
+              description="Track doctor fatigue, karma scores, shift swaps, and leave requests. Keep your team happy and prevent burnout."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<MapIcon className="w-6 h-6 text-rose-500" />}
               title="Locum Spend Optimization"
               description="Reduce reliance on expensive agency staff. RotaAI projects locum spend and actively suggests internal coverage alternatives."
@@ -142,11 +158,11 @@ export function LandingPage() {
           <p className="text-xl text-muted-foreground">
             Join the future of clinical workforce management today. Experience the power of AI-driven rotas.
           </p>
-          <Link 
-            to="/app" 
-            className="inline-flex items-center justify-center rounded-full text-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-14 px-10 shadow-lg shadow-primary/25"
+          <Link
+            to={user ? '/app' : '/register'}
+            className="inline-flex items-center justify-center rounded-full text-lg font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-14 px-10 shadow-lg shadow-primary/25"
           >
-            Launch RotaAI Now
+            {user ? 'Open RotaAI' : 'Start Free Trial'}
           </Link>
         </div>
       </section>
@@ -158,7 +174,7 @@ export function LandingPage() {
             <Stethoscope className="w-4 h-4" />
             <span>RotaAI</span>
           </div>
-          <p>© {new Date().getFullYear()} RotaAI. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} RotaAI. All rights reserved.</p>
         </div>
       </footer>
     </div>
@@ -188,16 +204,14 @@ function SparklesIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-6">
         {icon}
       </div>
       <h3 className="text-xl font-semibold mb-3">{title}</h3>
-      <p className="text-muted-foreground leading-relaxed">
-        {description}
-      </p>
+      <p className="text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );
 }

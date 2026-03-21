@@ -1,57 +1,81 @@
 import { prisma } from '../config/db.js';
-import * as pythonService from './python.service.js';
+import { callOptimizationEngine } from './python.service.js';
+import { logger } from '../config/logger.js';
 
 export const generateRota = async (startDate: string, endDate: string, rules: any) => {
-  // 1. Fetch all doctors
+  // 1. Fetch all doctors and existing shifts
   const doctors = await prisma.doctor.findMany({ include: { leaves: true } });
-  
-  // 2. Clear existing shifts for the period (simplified for prototype)
+  const existingShifts = await prisma.shift.findMany();
+
+  // 2. Fetch active rules
+  const activeRules = await prisma.rule.findMany({ where: { isActive: true } });
+
+  // 3. Call optimization engine (Python or fallback)
+  const payload = {
+    doctors: doctors.map((d) => ({
+      id: d.id,
+      name: d.name,
+      grade: d.grade,
+      department: d.department,
+      contract: d.contract,
+      maxHours: d.maxHours,
+      leaves: d.leaves.map((l) => ({
+        startDate: l.startDate.toISOString(),
+        endDate: l.endDate.toISOString(),
+        type: l.type,
+      })),
+    })),
+    shifts: existingShifts,
+    startDate,
+    endDate,
+    numDays: 7,
+    rules: activeRules.map((r) => ({
+      name: r.name,
+      severity: r.severity,
+      value: r.value,
+      category: r.category,
+    })),
+    constraints: rules || {},
+  };
+
+  logger.info('Generating rota via optimization engine...');
+  const result = await callOptimizationEngine(payload);
+
+  // 4. Clear existing shifts
   await prisma.shift.deleteMany();
 
-  // 3. Generate new shifts (Mocking the Python engine for now)
-  // In a real app, this would call pythonService.callOptimizationEngine
-  
-  const newShifts = [];
-  const shiftTypes = ['Day', 'Night', 'Long Day', 'Weekend'];
-  const shiftTimes = ['08:00 - 20:00', '20:00 - 08:00', '08:00 - 22:00', '08:00 - 20:00'];
-  
-  // Generate a somewhat realistic schedule
-  for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-    // Assign 2-3 doctors per day
-    const numDocs = Math.floor(Math.random() * 2) + 2;
-    const shuffledDocs = [...doctors].sort(() => 0.5 - Math.random());
-    
-    for (let i = 0; i < numDocs; i++) {
-      const doc = shuffledDocs[i];
-      if (!doc) continue;
-      
-      const typeIdx = Math.floor(Math.random() * shiftTypes.length);
-      
-      newShifts.push({
-        doctorId: doc.id,
-        dayIdx,
-        type: shiftTypes[typeIdx],
-        time: shiftTimes[typeIdx],
-        isLocum: doc.contract === 'Locum',
-        violation: false
-      });
-    }
-  }
-
-  // 4. Save the new shifts to the database
+  // 5. Save the new shifts
+  const assignments = result.assignments || [];
   const createdShifts = [];
-  for (const shift of newShifts) {
+
+  for (const shift of assignments) {
     const created = await prisma.shift.create({
-      data: shift
+      data: {
+        doctorId: shift.doctorId,
+        dayIdx: shift.dayIdx,
+        type: shift.type,
+        time: shift.time,
+        isLocum: shift.isLocum || false,
+        violation: shift.violation || false,
+      },
     });
     createdShifts.push(created);
   }
 
-  return createdShifts;
+  logger.info(`Rota generated: ${createdShifts.length} shifts created`, {
+    fairnessScore: result.fairness_score,
+    coverageScore: result.coverage_score,
+  });
+
+  return {
+    shifts: createdShifts,
+    fairnessScore: result.fairness_score,
+    coverageScore: result.coverage_score,
+    violations: result.violations || [],
+  };
 };
 
 export const updateRota = async (shifts: any[]) => {
-  // Update multiple shifts
   const results = [];
   for (const shift of shifts) {
     const updated = await prisma.shift.update({
@@ -60,8 +84,8 @@ export const updateRota = async (shifts: any[]) => {
         doctorId: shift.doctorId,
         type: shift.type,
         time: shift.time,
-        dayIdx: shift.dayIdx
-      }
+        dayIdx: shift.dayIdx,
+      },
     });
     results.push(updated);
   }

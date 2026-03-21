@@ -1,7 +1,9 @@
 import winston from 'winston';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 export const logger = winston.createLogger({
-  level: 'info',
+  level: isDev ? 'info' : 'warn',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()

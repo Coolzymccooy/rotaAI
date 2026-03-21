@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './pages/Dashboard';
 import { RotaBoard } from './pages/RotaBoard';
@@ -7,23 +7,51 @@ import { RulesStudio } from './pages/RulesStudio';
 import { WorkforceManager } from './pages/WorkforceManager';
 import { LiveMap } from './pages/LiveMap';
 import { LandingPage } from './pages/LandingPage';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { AuditLog } from './pages/AuditLog';
+import { BulkImport } from './pages/BulkImport';
+import { Settings } from './pages/Settings';
 import { ToastProvider } from './components/ui/Toast';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { SocketProvider } from './contexts/SocketContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 export default function App() {
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/app" element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="rota" element={<RotaBoard />} />
-            <Route path="map" element={<LiveMap />} />
-            <Route path="rules" element={<RulesStudio />} />
-            <Route path="workforce" element={<WorkforceManager />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ToastProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <SocketProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route
+                  path="/app"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Dashboard />} />
+                  <Route path="rota" element={<RotaBoard />} />
+                  <Route path="map" element={<LiveMap />} />
+                  <Route path="rules" element={<RulesStudio />} />
+                  <Route path="workforce" element={<WorkforceManager />} />
+                  <Route path="audit" element={<AuditLog />} />
+                  <Route path="import" element={<BulkImport />} />
+                  <Route path="settings" element={<Settings />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </SocketProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

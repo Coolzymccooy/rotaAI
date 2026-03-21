@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'rotaai-dev-jwt-secret-change-in-production';
+
 // Extend Express Request to include user
 declare global {
   namespace Express {
@@ -11,25 +13,34 @@ declare global {
 }
 
 export const protect = (req: Request, res: Response, next: NextFunction) => {
-  let token;
+  let token: string | undefined;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
 
   if (!token) {
-    // For development/sandbox, we can bypass auth if no token is provided
-    // In production, this should return 401
-    // Bypassing for demo purposes
-    req.user = { id: 'dev-user', role: 'admin' };
-    return next();
+    return res.status(401).json({ success: false, message: 'Not authorized - no token provided' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
+    return res.status(401).json({ success: false, message: 'Not authorized - invalid token' });
   }
+};
+
+// Role-based access control middleware
+export const authorize = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden - insufficient permissions' });
+    }
+    next();
+  };
 };

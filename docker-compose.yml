@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rotaai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rotaai
+      POSTGRES_USER: rotaai
+      POSTGRES_PASSWORD: rotaai_dev_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  python-engine:
+    build:
+      context: ./python_engine
+      dockerfile: Dockerfile
+    container_name: rotaai-optimizer
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      - PORT=8000
+
+volumes:
+  postgres_data:

@@ -8,6 +8,8 @@ const router = Router();
 
 router.use(protect); // All doctor routes are protected
 
+router.get('/filters', doctorController.getFilterOptions);
+
 router.route('/')
   .get(doctorController.getDoctors)
   .post(validate(createDoctorSchema), doctorController.createDoctor);

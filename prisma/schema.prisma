@@ -2,48 +2,143 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Using SQLite for the sandbox environment. 
-// To switch to PostgreSQL, change provider to "postgresql"
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("doctor")
+  doctorId  String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor    Doctor?  @relation(fields: [doctorId], references: [id])
+  auditLogs AuditLog[]
+}
+
 model Doctor {
-  id           String       @id @default(uuid())
-  name         String
-  grade        String       // e.g., "FY1", "SHO", "Registrar", "Consultant"
-  department   String       @default("A&E")
-  contract     String       // e.g., "100%", "80%"
-  fte          String       @default("1.0")
-  status       String       @default("Active")
-  karma        Int          @default(0)
-  fatigue      String       @default("Low")
-  maxHours     Float        @default(48.0)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  shifts       Shift[]
-  leaves       Leave[]
+  id                String   @id @default(uuid())
+  doctorCode        String?  @unique // e.g. "DOC00001" from CSV
+  gmcNumber         String?
+  title             String?
+  name              String
+  firstName         String?
+  lastName          String?
+  email             String?
+  grade             String
+  specialty         String?
+  department        String   @default("A&E")
+  site              String?
+  contract          String   @default("100%")
+  contractHours     Float?
+  fte               String   @default("1.0")
+  status            String   @default("Active")
+  karma             Int      @default(0)
+  fatigue           String   @default("Low")
+  maxHours          Float    @default(48.0)
+  rotaPattern       String?
+  skills            String?
+  canDoNights       Boolean  @default(true)
+  canDoOncall       Boolean  @default(true)
+  trainingDay       String?
+  preferredShift    String?
+  unavailableDay    String?
+  annualLeaveDays   Int?
+  studyLeaveDays    Int?
+  employmentStart   DateTime?
+  employmentEnd     DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  shifts            Shift[]
+  leaves            Leave[]
+  user              User?
+  swapsFrom         ShiftSwap[]  @relation("SwapRequester")
+  swapsTo           ShiftSwap[]  @relation("SwapTarget")
+  leaveRequests     LeaveRequest[]
+  preferences       DoctorPreference?
+  historicalLoad    HistoricalLoad?
+}
+
+model DoctorPreference {
+  id               String  @id @default(uuid())
+  doctorId         String  @unique
+  preferredShift   String?
+  unavailableDay   String?
+  trainingDay      String?
+  priorityFocus    String?
+  notes            String?
+  fairnessWeight   Int     @default(3)
+  preferenceWeight Int     @default(1)
+  continuityWeight Int     @default(2)
+
+  doctor           Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model HistoricalLoad {
+  id                  String @id @default(uuid())
+  doctorId            String @unique
+  weekendsYtd         Int    @default(0)
+  nightsYtd           Int    @default(0)
+  oncallsYtd          Int    @default(0)
+  hoursWorkedLast7    Float  @default(0)
+  complianceScore     Float  @default(1.0)
+  warningFlagsOpen    Int    @default(0)
+
+  doctor              Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model ShiftTemplate {
+  id              String  @id @default(uuid())
+  templateCode    String  @unique // e.g. "ST-DAY"
+  shiftType       String
+  startTime       String
+  endTime         String
+  paidHours       Float
+  countsTowardLimit Boolean @default(true)
+  residentShift   Boolean  @default(true)
+  weekendShift    Boolean  @default(false)
+  oncallShift     Boolean  @default(false)
+  notes           String?
+}
+
+model ServiceRequirement {
+  id                  String @id @default(uuid())
+  site                String
+  specialty           String
+  department          String
+  shiftType           String
+  minFyCover          Int    @default(0)
+  minShoCover         Int    @default(0)
+  minRegistrarCover   Int    @default(0)
+  minConsultantCover  Int    @default(0)
 }
 
 model Shift {
   id           String       @id @default(uuid())
   doctorId     String
   dayIdx       Int
-  type         String       // e.g., "Day", "Night", "Weekend"
-  time         String       // e.g., "08:00 - 20:00"
+  type         String
+  time         String
+  date         String?
   isLocum      Boolean      @default(false)
   violation    Boolean      @default(false)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   doctor       Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  swaps        ShiftSwap[]
 }
 
 model Leave {
   id        String   @id @default(uuid())
   doctorId  String
-  type      String   // e.g., "annual", "study", "sick"
+  type      String
   startDate DateTime
   endDate   DateTime
   createdAt DateTime @default(now())
@@ -52,14 +147,64 @@ model Leave {
   doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 }
 
+model LeaveRequest {
+  id         String    @id @default(uuid())
+  leaveCode  String?   @unique // e.g. "LV-00001-1" from CSV
+  doctorId   String
+  type       String
+  startDate  DateTime
+  endDate    DateTime
+  duration   Int?
+  reason     String?
+  status     String    @default("pending")
+  requestedVia String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  doctor     Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model ShiftSwap {
+  id              String   @id @default(uuid())
+  shiftId         String
+  requesterId     String
+  targetDoctorId  String
+  targetDayIdx    Int
+  reason          String?
+  status          String   @default("pending")
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shift           Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  requester       Doctor   @relation("SwapRequester", fields: [requesterId], references: [id])
+  targetDoctor    Doctor   @relation("SwapTarget", fields: [targetDoctorId], references: [id])
+}
+
 model Rule {
   id          String   @id @default(uuid())
   name        String
   description String
   isActive    Boolean  @default(true)
   category    String   @default("General")
-  severity    String   @default("Hard") // "Hard" or "Soft"
-  value       String?  // Optional value, e.g., "48" for max hours
+  severity    String   @default("Hard")
+  value       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  details     String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
 }

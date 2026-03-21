@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+prisma/dev.db
+prisma/dev.db-journal
+python_engine/__pycache__/
+.claude/
+tmp_import.json
