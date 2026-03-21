@@ -12,6 +12,7 @@ import { Register } from './pages/Register';
 import { AuditLog } from './pages/AuditLog';
 import { BulkImport } from './pages/BulkImport';
 import { Settings } from './pages/Settings';
+import { Integrations } from './pages/Integrations';
 import { ToastProvider } from './components/ui/Toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -45,6 +46,7 @@ export default function App() {
                   <Route path="audit" element={<AuditLog />} />
                   <Route path="import" element={<BulkImport />} />
                   <Route path="settings" element={<Settings />} />
+                  <Route path="integrations" element={<Integrations />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

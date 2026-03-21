@@ -208,3 +208,36 @@ model AuditLog {
 
   user        User?    @relation(fields: [userId], references: [id])
 }
+
+model IntegrationEvent {
+  id            String   @id @default(uuid())
+  source        String   // "epic", "cerner", "nhs-pds", "badge-reader", "fhir", "hl7v2", etc.
+  eventType     String   // "ADT_A01" (admit), "ADT_A03" (discharge), "ward-census", "staff-checkin", etc.
+  resourceType  String?  // FHIR resource type: "Encounter", "Patient", "Location", etc.
+  resourceId    String?  // External system's resource ID
+  wardId        String?
+  doctorCode    String?
+  payload       String?  // Raw JSON of the inbound message
+  status        String   @default("processed") // "processed", "failed", "ignored"
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+}
+
+model WardState {
+  id              String   @id @default(uuid())
+  wardCode        String   @unique
+  wardName        String
+  site            String?
+  department      String?
+  patients        Int      @default(0)
+  capacity        Int      @default(30)
+  staffPresent    Int      @default(0)
+  staffRequired   Int      @default(3)
+  acuityScore     Float    @default(0) // NEWS2 aggregate
+  status          String   @default("stable") // "critical", "warning", "stable", "overstaffed"
+  pendingAdmits   Int      @default(0)
+  pendingDischarges Int    @default(0)
+  lastEhrSync     DateTime?
+  lastStaffSync   DateTime?
+  updatedAt       DateTime @updatedAt
+}
