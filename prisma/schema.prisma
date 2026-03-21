@@ -7,23 +7,76 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("doctor")
-  doctorId  String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================
+// ORGANIZATION / MULTI-TENANCY
+// ============================================
 
-  doctor    Doctor?  @relation(fields: [doctorId], references: [id])
-  auditLogs AuditLog[]
+model Organization {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Manchester Foundation Trust"
+  slug        String   @unique // e.g. "mft" — used in URLs
+  type        String   @default("nhs_trust") // "nhs_trust", "private_hospital", "agency"
+  logo        String?
+  domain      String?  // Optional: auto-assign users from this email domain
+  maxUsers    Int      @default(500)
+  plan        String   @default("standard") // "trial", "standard", "enterprise"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  doctors     Doctor[]
+  shifts      Shift[]
+  rules       Rule[]
+  invites     Invite[]
+  shiftTemplates    ShiftTemplate[]
+  serviceRequirements ServiceRequirement[]
+  wardStates  WardState[]
+  auditLogs   AuditLog[]
 }
+
+model Invite {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  role           String    @default("doctor") // "admin" or "doctor"
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  name           String
+  role           String   @default("doctor")
+  organizationId String?
+  doctorId       String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  doctor         Doctor?  @relation(fields: [doctorId], references: [id])
+  auditLogs      AuditLog[]
+}
+
+// ============================================
+// CLINICAL DATA (all scoped to Organization)
+// ============================================
 
 model Doctor {
   id                String   @id @default(uuid())
-  doctorCode        String?  @unique // e.g. "DOC00001" from CSV
+  organizationId    String?
+  doctorCode        String?  @unique
   gmcNumber         String?
   title             String?
   name              String
@@ -55,6 +108,7 @@ model Doctor {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  organization      Organization? @relation(fields: [organizationId], references: [id])
   shifts            Shift[]
   leaves            Leave[]
   user              User?
@@ -95,7 +149,8 @@ model HistoricalLoad {
 
 model ShiftTemplate {
   id              String  @id @default(uuid())
-  templateCode    String  @unique // e.g. "ST-DAY"
+  organizationId  String?
+  templateCode    String  @unique
   shiftType       String
   startTime       String
   endTime         String
@@ -105,10 +160,13 @@ model ShiftTemplate {
   weekendShift    Boolean  @default(false)
   oncallShift     Boolean  @default(false)
   notes           String?
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
 }
 
 model ServiceRequirement {
   id                  String @id @default(uuid())
+  organizationId      String?
   site                String
   specialty           String
   department          String
@@ -117,22 +175,26 @@ model ServiceRequirement {
   minShoCover         Int    @default(0)
   minRegistrarCover   Int    @default(0)
   minConsultantCover  Int    @default(0)
+
+  organization        Organization? @relation(fields: [organizationId], references: [id])
 }
 
 model Shift {
-  id           String       @id @default(uuid())
-  doctorId     String
-  dayIdx       Int
-  type         String
-  time         String
-  date         String?
-  isLocum      Boolean      @default(false)
-  violation    Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  organizationId String?
+  doctorId       String
+  dayIdx         Int
+  type           String
+  time           String
+  date           String?
+  isLocum        Boolean      @default(false)
+  violation      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  doctor       Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  swaps        ShiftSwap[]
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  doctor         Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  swaps          ShiftSwap[]
 }
 
 model Leave {
@@ -149,7 +211,7 @@ model Leave {
 
 model LeaveRequest {
   id         String    @id @default(uuid())
-  leaveCode  String?   @unique // e.g. "LV-00001-1" from CSV
+  leaveCode  String?   @unique
   doctorId   String
   type       String
   startDate  DateTime
@@ -185,59 +247,67 @@ model ShiftSwap {
 }
 
 model Rule {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  isActive    Boolean  @default(true)
-  category    String   @default("General")
-  severity    String   @default("Hard")
-  value       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  organizationId String?
+  name           String
+  description    String
+  isActive       Boolean  @default(true)
+  category       String   @default("General")
+  severity       String   @default("Hard")
+  value          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?
-  action      String
-  entity      String
-  entityId    String?
-  details     String?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
+  id             String   @id @default(uuid())
+  organizationId String?
+  userId         String?
+  action         String
+  entity         String
+  entityId       String?
+  details        String?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
 
-  user        User?    @relation(fields: [userId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  user           User?    @relation(fields: [userId], references: [id])
 }
 
 model IntegrationEvent {
   id            String   @id @default(uuid())
-  source        String   // "epic", "cerner", "nhs-pds", "badge-reader", "fhir", "hl7v2", etc.
-  eventType     String   // "ADT_A01" (admit), "ADT_A03" (discharge), "ward-census", "staff-checkin", etc.
-  resourceType  String?  // FHIR resource type: "Encounter", "Patient", "Location", etc.
-  resourceId    String?  // External system's resource ID
+  source        String
+  eventType     String
+  resourceType  String?
+  resourceId    String?
   wardId        String?
   doctorCode    String?
-  payload       String?  // Raw JSON of the inbound message
-  status        String   @default("processed") // "processed", "failed", "ignored"
+  payload       String?
+  status        String   @default("processed")
   errorMessage  String?
   createdAt     DateTime @default(now())
 }
 
 model WardState {
-  id              String   @id @default(uuid())
-  wardCode        String   @unique
-  wardName        String
-  site            String?
-  department      String?
-  patients        Int      @default(0)
-  capacity        Int      @default(30)
-  staffPresent    Int      @default(0)
-  staffRequired   Int      @default(3)
-  acuityScore     Float    @default(0) // NEWS2 aggregate
-  status          String   @default("stable") // "critical", "warning", "stable", "overstaffed"
-  pendingAdmits   Int      @default(0)
-  pendingDischarges Int    @default(0)
-  lastEhrSync     DateTime?
-  lastStaffSync   DateTime?
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(uuid())
+  organizationId    String?
+  wardCode          String   @unique
+  wardName          String
+  site              String?
+  department        String?
+  patients          Int      @default(0)
+  capacity          Int      @default(30)
+  staffPresent      Int      @default(0)
+  staffRequired     Int      @default(3)
+  acuityScore       Float    @default(0)
+  status            String   @default("stable")
+  pendingAdmits     Int      @default(0)
+  pendingDischarges Int      @default(0)
+  lastEhrSync       DateTime?
+  lastStaffSync     DateTime?
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization? @relation(fields: [organizationId], references: [id])
 }

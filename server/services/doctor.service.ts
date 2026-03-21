@@ -9,6 +9,7 @@ export interface DoctorFilters {
   status?: string;
   page?: number;
   limit?: number;
+  organizationId?: string;
 }
 
 export const getDoctors = async (filters: DoctorFilters = {}) => {
@@ -17,6 +18,9 @@ export const getDoctors = async (filters: DoctorFilters = {}) => {
   const skip = (page - 1) * limit;
 
   const where: any = {};
+
+  // Tenant scoping
+  if (filters.organizationId) where.organizationId = filters.organizationId;
 
   if (filters.search) {
     where.OR = [
@@ -32,25 +36,22 @@ export const getDoctors = async (filters: DoctorFilters = {}) => {
   if (filters.status) where.status = filters.status;
 
   const [data, total] = await Promise.all([
-    prisma.doctor.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      skip,
-      take: limit,
-    }),
+    prisma.doctor.findMany({ where, orderBy: { name: 'asc' }, skip, take: limit }),
     prisma.doctor.count({ where }),
   ]);
 
   return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
 };
 
-// Get distinct values for filter dropdowns
-export const getFilterOptions = async () => {
+export const getFilterOptions = async (organizationId?: string) => {
+  const where: any = {};
+  if (organizationId) where.organizationId = organizationId;
+
   const [grades, departments, specialties, sites] = await Promise.all([
-    prisma.doctor.findMany({ select: { grade: true }, distinct: ['grade'], orderBy: { grade: 'asc' } }),
-    prisma.doctor.findMany({ select: { department: true }, distinct: ['department'], orderBy: { department: 'asc' } }),
-    prisma.doctor.findMany({ where: { specialty: { not: null } }, select: { specialty: true }, distinct: ['specialty'], orderBy: { specialty: 'asc' } }),
-    prisma.doctor.findMany({ where: { site: { not: null } }, select: { site: true }, distinct: ['site'], orderBy: { site: 'asc' } }),
+    prisma.doctor.findMany({ where, select: { grade: true }, distinct: ['grade'], orderBy: { grade: 'asc' } }),
+    prisma.doctor.findMany({ where, select: { department: true }, distinct: ['department'], orderBy: { department: 'asc' } }),
+    prisma.doctor.findMany({ where: { ...where, specialty: { not: null } }, select: { specialty: true }, distinct: ['specialty'], orderBy: { specialty: 'asc' } }),
+    prisma.doctor.findMany({ where: { ...where, site: { not: null } }, select: { site: true }, distinct: ['site'], orderBy: { site: 'asc' } }),
   ]);
 
   return {
@@ -61,25 +62,27 @@ export const getFilterOptions = async () => {
   };
 };
 
-export const getAllDoctors = async () => {
-  return await prisma.doctor.findMany();
+export const getAllDoctors = async (organizationId?: string) => {
+  const where: any = {};
+  if (organizationId) where.organizationId = organizationId;
+  return prisma.doctor.findMany({ where });
 };
 
 export const getDoctorById = async (id: string) => {
-  return await prisma.doctor.findUnique({
+  return prisma.doctor.findUnique({
     where: { id },
     include: { leaves: true, shifts: true, preferences: true, historicalLoad: true },
   });
 };
 
 export const createDoctor = async (data: any) => {
-  return await prisma.doctor.create({ data });
+  return prisma.doctor.create({ data });
 };
 
 export const updateDoctor = async (id: string, data: any) => {
-  return await prisma.doctor.update({ where: { id }, data });
+  return prisma.doctor.update({ where: { id }, data });
 };
 
 export const deleteDoctor = async (id: string) => {
-  return await prisma.doctor.delete({ where: { id } });
+  return prisma.doctor.delete({ where: { id } });
 };

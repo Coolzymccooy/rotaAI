@@ -6,9 +6,21 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
+  // Create organization
+  const org = await prisma.organization.upsert({
+    where: { slug: 'mft-demo' },
+    update: {},
+    create: {
+      name: 'Manchester Foundation Trust (Demo)',
+      slug: 'mft-demo',
+      type: 'nhs_trust',
+      plan: 'enterprise',
+    },
+  });
+
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'admin@rotaai.com' },
     update: {},
     create: {
@@ -16,6 +28,7 @@ async function main() {
       password: adminPassword,
       name: 'Segun Alabi',
       role: 'admin',
+      organizationId: org.id,
     },
   });
 
@@ -31,58 +44,50 @@ async function main() {
 
   const createdDoctors = [];
   for (const doc of doctors) {
-    const created = await prisma.doctor.create({ data: doc });
+    const created = await prisma.doctor.create({ data: { ...doc, organizationId: org.id } });
     createdDoctors.push(created);
   }
 
   // Create doctor user accounts
   const doctorPassword = await bcrypt.hash('doctor123', 10);
   for (const doc of createdDoctors) {
-    await prisma.user.create({
-      data: {
-        email: `${doc.name.toLowerCase().replace(/dr\.\s+/i, '').replace(/\s+/g, '.')}@nhs.net`,
+    const email = `${doc.name.toLowerCase().replace(/dr\.\s+/i, '').replace(/\s+/g, '.')}@nhs.net`;
+    await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
         password: doctorPassword,
         name: doc.name,
         role: 'doctor',
         doctorId: doc.id,
+        organizationId: org.id,
       },
     });
   }
 
   // Create shifts
-  const shiftTypes = ['Day', 'Night', 'Long Day', 'Weekend'];
   const shiftTimes: Record<string, string> = {
-    'Day': '08:00 - 20:00',
-    'Night': '20:00 - 08:00',
-    'Long Day': '08:00 - 22:00',
-    'Weekend': '08:00 - 20:00',
+    'Day': '08:00 - 20:00', 'Night': '20:00 - 08:00', 'Long Day': '08:00 - 22:00', 'Weekend': '08:00 - 20:00',
   };
 
   const shifts = [
-    { doctorIdx: 0, dayIdx: 0, type: 'Day' },
-    { doctorIdx: 0, dayIdx: 1, type: 'Day' },
-    { doctorIdx: 0, dayIdx: 3, type: 'Long Day' },
-    { doctorIdx: 1, dayIdx: 2, type: 'Night' },
-    { doctorIdx: 1, dayIdx: 3, type: 'Night' },
-    { doctorIdx: 2, dayIdx: 0, type: 'Night' },
-    { doctorIdx: 2, dayIdx: 5, type: 'Weekend' },
-    { doctorIdx: 3, dayIdx: 1, type: 'Day' },
-    { doctorIdx: 3, dayIdx: 4, type: 'Day' },
-    { doctorIdx: 3, dayIdx: 6, type: 'Weekend' },
-    { doctorIdx: 4, dayIdx: 4, type: 'Day', violation: true },
-    { doctorIdx: 4, dayIdx: 5, type: 'Weekend' },
-    { doctorIdx: 5, dayIdx: 2, type: 'Day' },
-    { doctorIdx: 5, dayIdx: 6, type: 'Night' },
+    { doctorIdx: 0, dayIdx: 0, type: 'Day' }, { doctorIdx: 0, dayIdx: 1, type: 'Day' }, { doctorIdx: 0, dayIdx: 3, type: 'Long Day' },
+    { doctorIdx: 1, dayIdx: 2, type: 'Night' }, { doctorIdx: 1, dayIdx: 3, type: 'Night' },
+    { doctorIdx: 2, dayIdx: 0, type: 'Night' }, { doctorIdx: 2, dayIdx: 5, type: 'Weekend' },
+    { doctorIdx: 3, dayIdx: 1, type: 'Day' }, { doctorIdx: 3, dayIdx: 4, type: 'Day' }, { doctorIdx: 3, dayIdx: 6, type: 'Weekend' },
+    { doctorIdx: 4, dayIdx: 4, type: 'Day', violation: true }, { doctorIdx: 4, dayIdx: 5, type: 'Weekend' },
+    { doctorIdx: 5, dayIdx: 2, type: 'Day' }, { doctorIdx: 5, dayIdx: 6, type: 'Night' },
   ];
 
   for (const s of shifts) {
     await prisma.shift.create({
       data: {
         doctorId: createdDoctors[s.doctorIdx].id,
+        organizationId: org.id,
         dayIdx: s.dayIdx,
         type: s.type,
         time: shiftTimes[s.type],
-        isLocum: false,
         violation: (s as any).violation || false,
       },
     });
@@ -98,31 +103,15 @@ async function main() {
   ];
 
   for (const rule of rules) {
-    await prisma.rule.create({ data: rule });
+    await prisma.rule.create({ data: { ...rule, organizationId: org.id } });
   }
 
-  // Create a sample leave request
-  await prisma.leaveRequest.create({
-    data: {
-      doctorId: createdDoctors[1].id,
-      type: 'annual',
-      startDate: new Date('2026-03-25'),
-      endDate: new Date('2026-03-28'),
-      reason: 'Family holiday',
-      status: 'pending',
-    },
-  });
-
   console.log('Database seeded successfully!');
+  console.log(`Organization: ${org.name} (${org.slug})`);
   console.log(`Admin login: admin@rotaai.com / admin123`);
   console.log(`Doctor login: sarah.smith@nhs.net / doctor123`);
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });

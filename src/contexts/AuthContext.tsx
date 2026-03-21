@@ -6,6 +6,8 @@ interface User {
   name: string;
   role: 'admin' | 'doctor';
   doctorId?: string | null;
+  organizationId?: string | null;
+  organization?: { id: string; name: string; slug: string } | null;
 }
 
 interface AuthContextType {

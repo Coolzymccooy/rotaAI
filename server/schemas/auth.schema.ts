@@ -6,6 +6,8 @@ export const registerSchema = z.object({
     password: z.string().min(6, 'Password must be at least 6 characters'),
     name: z.string().min(1, 'Name is required'),
     role: z.enum(['admin', 'doctor']).optional(),
+    organizationName: z.string().optional(),
+    inviteToken: z.string().optional(),
   }),
 });
 

@@ -1,10 +1,3 @@
-// PostgreSQL version of the schema
-// To migrate:
-// 1. Run `docker-compose up -d postgres`
-// 2. Update .env: DATABASE_URL="postgresql://rotaai:rotaai_dev_password@localhost:5432/rotaai"
-// 3. Copy this file over schema.prisma
-// 4. Run `npx prisma db push`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,55 +7,194 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("doctor")
-  doctorId  String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================
+// ORGANIZATION / MULTI-TENANCY
+// ============================================
 
-  doctor    Doctor?  @relation(fields: [doctorId], references: [id])
-  auditLogs AuditLog[]
+model Organization {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Manchester Foundation Trust"
+  slug        String   @unique // e.g. "mft" — used in URLs
+  type        String   @default("nhs_trust") // "nhs_trust", "private_hospital", "agency"
+  logo        String?
+  domain      String?  // Optional: auto-assign users from this email domain
+  maxUsers    Int      @default(500)
+  plan        String   @default("standard") // "trial", "standard", "enterprise"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  doctors     Doctor[]
+  shifts      Shift[]
+  rules       Rule[]
+  invites     Invite[]
+  shiftTemplates    ShiftTemplate[]
+  serviceRequirements ServiceRequirement[]
+  wardStates  WardState[]
+  auditLogs   AuditLog[]
 }
 
+model Invite {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  role           String    @default("doctor") // "admin" or "doctor"
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  name           String
+  role           String   @default("doctor")
+  organizationId String?
+  doctorId       String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  doctor         Doctor?  @relation(fields: [doctorId], references: [id])
+  auditLogs      AuditLog[]
+}
+
+// ============================================
+// CLINICAL DATA (all scoped to Organization)
+// ============================================
+
 model Doctor {
-  id           String       @id @default(uuid())
-  name         String
-  grade        String
-  department   String       @default("A&E")
-  contract     String
-  fte          String       @default("1.0")
-  status       String       @default("Active")
-  karma        Int          @default(0)
-  fatigue      String       @default("Low")
-  maxHours     Float        @default(48.0)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  shifts       Shift[]
-  leaves       Leave[]
-  user         User?
-  swapsFrom    ShiftSwap[]  @relation("SwapRequester")
-  swapsTo      ShiftSwap[]  @relation("SwapTarget")
-  leaveRequests LeaveRequest[]
+  id                String   @id @default(uuid())
+  organizationId    String?
+  doctorCode        String?  @unique
+  gmcNumber         String?
+  title             String?
+  name              String
+  firstName         String?
+  lastName          String?
+  email             String?
+  grade             String
+  specialty         String?
+  department        String   @default("A&E")
+  site              String?
+  contract          String   @default("100%")
+  contractHours     Float?
+  fte               String   @default("1.0")
+  status            String   @default("Active")
+  karma             Int      @default(0)
+  fatigue           String   @default("Low")
+  maxHours          Float    @default(48.0)
+  rotaPattern       String?
+  skills            String?
+  canDoNights       Boolean  @default(true)
+  canDoOncall       Boolean  @default(true)
+  trainingDay       String?
+  preferredShift    String?
+  unavailableDay    String?
+  annualLeaveDays   Int?
+  studyLeaveDays    Int?
+  employmentStart   DateTime?
+  employmentEnd     DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+  shifts            Shift[]
+  leaves            Leave[]
+  user              User?
+  swapsFrom         ShiftSwap[]  @relation("SwapRequester")
+  swapsTo           ShiftSwap[]  @relation("SwapTarget")
+  leaveRequests     LeaveRequest[]
+  preferences       DoctorPreference?
+  historicalLoad    HistoricalLoad?
+}
+
+model DoctorPreference {
+  id               String  @id @default(uuid())
+  doctorId         String  @unique
+  preferredShift   String?
+  unavailableDay   String?
+  trainingDay      String?
+  priorityFocus    String?
+  notes            String?
+  fairnessWeight   Int     @default(3)
+  preferenceWeight Int     @default(1)
+  continuityWeight Int     @default(2)
+
+  doctor           Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model HistoricalLoad {
+  id                  String @id @default(uuid())
+  doctorId            String @unique
+  weekendsYtd         Int    @default(0)
+  nightsYtd           Int    @default(0)
+  oncallsYtd          Int    @default(0)
+  hoursWorkedLast7    Float  @default(0)
+  complianceScore     Float  @default(1.0)
+  warningFlagsOpen    Int    @default(0)
+
+  doctor              Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model ShiftTemplate {
+  id              String  @id @default(uuid())
+  organizationId  String?
+  templateCode    String  @unique
+  shiftType       String
+  startTime       String
+  endTime         String
+  paidHours       Float
+  countsTowardLimit Boolean @default(true)
+  residentShift   Boolean  @default(true)
+  weekendShift    Boolean  @default(false)
+  oncallShift     Boolean  @default(false)
+  notes           String?
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model ServiceRequirement {
+  id                  String @id @default(uuid())
+  organizationId      String?
+  site                String
+  specialty           String
+  department          String
+  shiftType           String
+  minFyCover          Int    @default(0)
+  minShoCover         Int    @default(0)
+  minRegistrarCover   Int    @default(0)
+  minConsultantCover  Int    @default(0)
+
+  organization        Organization? @relation(fields: [organizationId], references: [id])
 }
 
 model Shift {
-  id           String       @id @default(uuid())
-  doctorId     String
-  dayIdx       Int
-  type         String
-  time         String
-  date         String?
-  isLocum      Boolean      @default(false)
-  violation    Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  organizationId String?
+  doctorId       String
+  dayIdx         Int
+  type           String
+  time           String
+  date           String?
+  isLocum        Boolean      @default(false)
+  violation      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  doctor       Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  swaps        ShiftSwap[]
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  doctor         Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  swaps          ShiftSwap[]
 }
 
 model Leave {
@@ -78,19 +210,22 @@ model Leave {
 }
 
 model LeaveRequest {
-  id        String   @id @default(uuid())
-  doctorId  String
-  type      String
-  startDate DateTime
-  endDate   DateTime
-  reason    String?
-  status    String   @default("pending")
+  id         String    @id @default(uuid())
+  leaveCode  String?   @unique
+  doctorId   String
+  type       String
+  startDate  DateTime
+  endDate    DateTime
+  duration   Int?
+  reason     String?
+  status     String    @default("pending")
+  requestedVia String?
   reviewedBy String?
   reviewedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctor     Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 }
 
 model ShiftSwap {
@@ -112,26 +247,67 @@ model ShiftSwap {
 }
 
 model Rule {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  isActive    Boolean  @default(true)
-  category    String   @default("General")
-  severity    String   @default("Hard")
-  value       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  organizationId String?
+  name           String
+  description    String
+  isActive       Boolean  @default(true)
+  category       String   @default("General")
+  severity       String   @default("Hard")
+  value          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?
-  action      String
-  entity      String
-  entityId    String?
-  details     String?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
+  id             String   @id @default(uuid())
+  organizationId String?
+  userId         String?
+  action         String
+  entity         String
+  entityId       String?
+  details        String?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
 
-  user        User?    @relation(fields: [userId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  user           User?    @relation(fields: [userId], references: [id])
+}
+
+model IntegrationEvent {
+  id            String   @id @default(uuid())
+  source        String
+  eventType     String
+  resourceType  String?
+  resourceId    String?
+  wardId        String?
+  doctorCode    String?
+  payload       String?
+  status        String   @default("processed")
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+}
+
+model WardState {
+  id                String   @id @default(uuid())
+  organizationId    String?
+  wardCode          String   @unique
+  wardName          String
+  site              String?
+  department        String?
+  patients          Int      @default(0)
+  capacity          Int      @default(30)
+  staffPresent      Int      @default(0)
+  staffRequired     Int      @default(3)
+  acuityScore       Float    @default(0)
+  status            String   @default("stable")
+  pendingAdmits     Int      @default(0)
+  pendingDischarges Int      @default(0)
+  lastEhrSync       DateTime?
+  lastStaffSync     DateTime?
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization? @relation(fields: [organizationId], references: [id])
 }
