@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -6,29 +6,23 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-
-# Use PostgreSQL schema for production build
 COPY prisma/schema.postgresql.prisma prisma/schema.prisma
 
 RUN npx prisma generate
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
-
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/package*.json ./
 COPY prisma/schema.postgresql.prisma prisma/schema.prisma
 COPY prisma/seed.ts prisma/seed.ts
 COPY server ./server
 COPY tsconfig.json ./
-COPY vite.config.ts ./
 COPY index.html ./
 COPY src ./src
 
@@ -37,4 +31,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate 2>&1 || true; echo 'Starting server...'; exec npx tsx server/index.ts 2>&1"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate 2>&1; echo 'DB ready. Starting server on port 3000...'; exec node --import tsx server/index.ts 2>&1"]
