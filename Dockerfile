@@ -35,4 +35,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate 2>&1; echo 'DB ready.'; exec ./node_modules/.bin/tsx server/index.ts"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate 2>&1; echo 'DB ready. Testing tsx...'; node -e 'console.log(\"node works\")' 2>&1; ./node_modules/.bin/tsx -e 'console.log(\"tsx works\")' 2>&1; echo 'Starting server...'; exec ./node_modules/.bin/tsx server/index.ts 2>&1"]
