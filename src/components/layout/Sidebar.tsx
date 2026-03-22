@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, LayoutDashboard, Settings as SettingsIcon, Users, Stethoscope, Map as MapIcon, ClipboardList, LogOut, X, Upload, Cog, Plug, UserPlus, CalendarRange, UserCircle, Inbox } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Settings as SettingsIcon, Users, Stethoscope, Map as MapIcon, ClipboardList, LogOut, X, Upload, Cog, Plug, UserPlus, CalendarRange, UserCircle, Inbox, Shield } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,6 +26,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       { icon: UserPlus, label: 'Team', path: '/app/team' },
       { icon: Upload, label: 'Bulk Import', path: '/app/import' },
       { icon: Plug, label: 'Integrations', path: '/app/integrations' },
+      { icon: Shield, label: 'Compliance', path: '/app/compliance' },
       { icon: ClipboardList, label: 'Audit Log', path: '/app/audit' },
     ] : []),
     { icon: Cog, label: 'Settings', path: '/app/settings' },

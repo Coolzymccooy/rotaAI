@@ -35,6 +35,7 @@ model Organization {
   auditLogs   AuditLog[]
   rotaPeriods RotaPeriod[]
   staffRequests StaffRequest[]
+  staffMembers StaffMember[]
 }
 
 model Invite {
@@ -61,14 +62,26 @@ model User {
   password       String
   name           String
   role           String   @default("doctor")
+  // Granular roles: "admin", "rota_coordinator", "department_lead",
+  // "doctor", "nurse", "anp", "pa", "pharmacist", "hca",
+  // "midwife", "ot", "physio", "paramedic", "porter", "clerk"
+  clinicalRole   String?  // More specific than role — the actual job title
   organizationId String?
   doctorId       String?  @unique
+  consentGiven   Boolean  @default(false)
+  consentDate    DateTime?
+  lastLoginAt    DateTime?
+  lastLoginIp    String?
+  mfaEnabled     Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  deactivatedAt  DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization   Organization? @relation(fields: [organizationId], references: [id])
   doctor         Doctor?  @relation(fields: [doctorId], references: [id])
   auditLogs      AuditLog[]
+  dataExports    DataExport[]
 }
 
 // ============================================
@@ -377,6 +390,108 @@ model WardState {
   pendingDischarges Int      @default(0)
   lastEhrSync       DateTime?
   lastStaffSync     DateTime?
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================
+// DTAC / GDPR COMPLIANCE
+// ============================================
+
+model DataExport {
+  id             String   @id @default(uuid())
+  userId         String
+  type           String   // "subject_access_request", "data_export", "right_to_erasure"
+  status         String   @default("pending") // "pending", "processing", "completed", "failed"
+  format         String   @default("json") // "json", "csv"
+  downloadUrl    String?
+  requestedAt    DateTime @default(now())
+  completedAt    DateTime?
+  expiresAt      DateTime?
+
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model ConsentRecord {
+  id             String   @id @default(uuid())
+  userId         String?
+  email          String
+  consentType    String   // "data_processing", "communications", "analytics", "third_party_sharing"
+  granted        Boolean
+  version        String   @default("1.0") // Policy version consented to
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+  revokedAt      DateTime?
+}
+
+model DataRetentionPolicy {
+  id             String   @id @default(uuid())
+  organizationId String?
+  entity         String   // "AuditLog", "IntegrationEvent", "Shift", "LeaveRequest", etc.
+  retentionDays  Int      @default(2555) // ~7 years (NHS standard)
+  autoDelete     Boolean  @default(false)
+  lastPurgedAt   DateTime?
+  createdAt      DateTime @default(now())
+}
+
+// ============================================
+// DEEP AUDIT TRAIL (CQC-grade)
+// ============================================
+
+model ChangeLog {
+  id             String   @id @default(uuid())
+  organizationId String?
+  userId         String?
+  userName       String?
+  userRole       String?
+  action         String   // "CREATE", "UPDATE", "DELETE", "VIEW", "EXPORT", "LOGIN", "APPROVE", "REJECT"
+  entity         String   // "Shift", "Doctor", "Rule", "LeaveRequest", etc.
+  entityId       String?
+  fieldName      String?  // Specific field changed (for UPDATE actions)
+  oldValue       String?  // Before value
+  newValue       String?  // After value
+  reason         String?  // Why the change was made
+  ipAddress      String?
+  userAgent      String?
+  sessionId      String?
+  createdAt      DateTime @default(now())
+}
+
+// ============================================
+// CLINICAL ROLES (expanded beyond doctor)
+// ============================================
+
+model StaffMember {
+  id                String   @id @default(uuid())
+  organizationId    String?
+  staffCode         String?  @unique
+  registrationNumber String? // GMC, NMC, GPhC, HCPC number
+  registrationBody  String?  // "GMC", "NMC", "GPhC", "HCPC"
+  title             String?
+  name              String
+  firstName         String?
+  lastName          String?
+  email             String?
+  clinicalRole      String   // "doctor", "nurse", "anp", "pa", "pharmacist", "hca", "midwife", "ot", "physio", "paramedic"
+  band              String?  // NHS pay band: "Band 5", "Band 6", "Band 7", "Band 8a", etc.
+  grade             String?  // "Consultant", "Registrar", "Staff Nurse", "Senior Sister", etc.
+  specialty         String?
+  department        String   @default("General")
+  site              String?
+  contract          String   @default("100%")
+  contractHours     Float?
+  fte               String   @default("1.0")
+  status            String   @default("Active")
+  maxHours          Float    @default(48.0)
+  canDoNights       Boolean  @default(true)
+  canDoOncall       Boolean  @default(true)
+  skills            String?  // Semicolon-separated: "IV access; catheter; ventilator"
+  trainingDay       String?
+  employmentStart   DateTime?
+  employmentEnd     DateTime?
+  createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   organization      Organization? @relation(fields: [organizationId], references: [id])
