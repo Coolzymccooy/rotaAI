@@ -81,26 +81,30 @@ function optimizedScheduler(payload: any) {
 
   // Track state per doctor
   const state: Record<string, {
-    hoursWorked: number;
+    weeklyHours: number[];  // Hours per rolling 7-day window
     lastShiftDay: number;
     lastShiftType: string;
     consecutiveNights: number;
-    shiftsAssigned: number;
+    totalShifts: number;
     weekendShifts: number;
     nightShifts: number;
   }> = {};
 
   doctors.forEach((d: any) => {
     state[d.id] = {
-      hoursWorked: 0,
-      lastShiftDay: -2, // No shift yet
+      weeklyHours: [],
+      lastShiftDay: -2,
       lastShiftType: '',
       consecutiveNights: 0,
-      shiftsAssigned: 0,
+      totalShifts: 0,
       weekendShifts: 0,
       nightShifts: 0,
     };
   });
+
+  // Calculate the start date's day of week (0=Mon, 6=Sun)
+  const periodStart = new Date(startDate);
+  const startDayOfWeek = (periodStart.getDay() + 6) % 7; // Convert JS Sun=0 to Mon=0
 
   // Determine shifts needed per day (scale with workforce size)
   const baseShiftsPerDay = Math.max(3, Math.ceil(doctors.length * 0.4));
@@ -117,8 +121,19 @@ function optimizedScheduler(payload: any) {
     { type: 'Night', count: Math.ceil(baseShiftsPerDay * 0.5) },
   ];
 
+  // Helper: get current week's hours for a doctor
+  function getCurrentWeekHours(docId: string, currentDay: number): number {
+    const s = state[docId];
+    // Sum hours from shifts in the last 7 days
+    return s.weeklyHours
+      .filter((_, idx) => idx >= Math.max(0, currentDay - 6) && idx <= currentDay)
+      .reduce((sum, h) => sum + h, 0);
+  }
+
   for (let dayIdx = 0; dayIdx < numDays; dayIdx++) {
-    const isWeekend = dayIdx >= 5;
+    // Calculate actual day of week for this dayIdx
+    const dayOfWeek = (startDayOfWeek + dayIdx) % 7; // 0=Mon, 5=Sat, 6=Sun
+    const isWeekend = dayOfWeek >= 5;
     const slots = isWeekend ? weekendSlots : weekdaySlots;
 
     for (const slot of slots) {
@@ -130,8 +145,9 @@ function optimizedScheduler(payload: any) {
 
           const hours = shiftHours[slot.type];
 
-          // EWTD: max weekly hours
-          if (s.hoursWorked + hours > (d.maxHours || maxWeeklyHours)) return false;
+          // EWTD: max weekly hours (rolling 7-day window)
+          const weekHours = getCurrentWeekHours(d.id, dayIdx);
+          if (weekHours + hours > (d.maxHours || maxWeeklyHours)) return false;
 
           // 11h rest: can't work consecutive days if last shift was Night
           if (s.lastShiftDay === dayIdx - 1 && s.lastShiftType === 'Night') return false;
@@ -163,12 +179,12 @@ function optimizedScheduler(payload: any) {
           const sa = state[a.id];
           const sb = state[b.id];
           // Primary: least total hours (fairness)
-          const hoursDiff = sa.hoursWorked - sb.hoursWorked;
+          const hoursDiff = sa.totalShifts - sb.totalShifts;
           if (Math.abs(hoursDiff) > 2) return hoursDiff;
           // Secondary: least shifts of this type (balance)
           if (isWeekend) return sa.weekendShifts - sb.weekendShifts;
           if (slot.type === 'Night') return sa.nightShifts - sb.nightShifts;
-          return sa.shiftsAssigned - sb.shiftsAssigned;
+          return sa.totalShifts - sb.totalShifts;
         });
 
       const toAssign = Math.min(slot.count, candidates.length);
@@ -178,8 +194,10 @@ function optimizedScheduler(payload: any) {
         const s = state[doc.id];
         const hours = shiftHours[slot.type];
 
-        s.hoursWorked += hours;
-        s.shiftsAssigned++;
+        // Track hours per day for rolling 7-day window
+        while (s.weeklyHours.length <= dayIdx) s.weeklyHours.push(0);
+        s.weeklyHours[dayIdx] = (s.weeklyHours[dayIdx] || 0) + hours;
+        s.totalShifts++;
         s.lastShiftDay = dayIdx;
         s.lastShiftType = slot.type;
 
@@ -216,7 +234,7 @@ function optimizedScheduler(payload: any) {
   }
 
   // Calculate scores
-  const hoursValues = Object.values(state).map(s => s.hoursWorked).filter(h => h > 0);
+  const hoursValues = Object.values(state).map(s => s.weeklyHours.reduce((a, b) => a + b, 0)).filter(h => h > 0);
   const avgHours = hoursValues.length > 0 ? hoursValues.reduce((a, b) => a + b, 0) / hoursValues.length : 0;
   const variance = hoursValues.length > 0
     ? hoursValues.reduce((sum, h) => sum + Math.pow(h - avgHours, 2), 0) / hoursValues.length
