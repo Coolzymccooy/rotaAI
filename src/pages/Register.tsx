@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Stethoscope, Loader2, Eye, EyeOff, Building2, Mail } from 'lucide-react';
+import { Stethoscope, Loader2, Eye, EyeOff, Building2, Mail, Search, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
+import { UK_TRUSTS, type TrustOption } from '../data/ukTrusts';
 
 export function Register() {
   const [searchParams] = useSearchParams();
@@ -130,13 +131,7 @@ export function Register() {
             )}
 
             {mode === 'create-org' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Organization / Trust Name</label>
-                <input type="text" required value={orgName} onChange={(e) => setOrgName(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md bg-secondary text-foreground border border-border focus:border-primary outline-none text-sm"
-                  placeholder="e.g. Manchester Foundation Trust" />
-                <p className="text-xs text-muted-foreground">You'll be the admin of this organization.</p>
-              </div>
+              <TrustSelector value={orgName} onChange={setOrgName} />
             )}
 
             <div className="space-y-2">
@@ -189,6 +184,133 @@ export function Register() {
           </div>
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+// Searchable Trust Dropdown
+function TrustSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const regions = [...new Set(UK_TRUSTS.map(t => t.region))].sort();
+
+  const filtered = UK_TRUSTS.filter(t => {
+    const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase());
+    const matchesRegion = !regionFilter || t.region === regionFilter;
+    return matchesSearch && matchesRegion;
+  });
+
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case 'acute': return 'NHS Acute';
+      case 'specialist': return 'NHS Specialist';
+      case 'mental_health': return 'Mental Health';
+      case 'ambulance': return 'Ambulance';
+      case 'private': return 'Private';
+      default: return type;
+    }
+  };
+
+  const typeColor = (type: string) => {
+    switch (type) {
+      case 'acute': return 'text-primary';
+      case 'specialist': return 'text-purple-500';
+      case 'private': return 'text-amber-500';
+      case 'ambulance': return 'text-emerald-500';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  return (
+    <div className="space-y-2" ref={ref}>
+      <label className="text-sm font-medium">Organization / Trust</label>
+
+      {/* Selected value or trigger */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full h-10 px-3 rounded-md bg-secondary text-foreground border border-border text-sm text-left flex items-center justify-between ${
+          isOpen ? 'border-primary ring-1 ring-primary' : ''
+        }`}
+      >
+        <span className={value ? 'text-foreground' : 'text-muted-foreground'}>
+          {value || 'Select your NHS Trust or Hospital...'}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 w-[calc(100%-4rem)] mt-1 bg-card border border-border rounded-lg shadow-xl max-h-72 flex flex-col">
+          {/* Search + Region filter */}
+          <div className="p-2 border-b border-border space-y-2">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search trusts..."
+                autoFocus
+                className="w-full h-8 pl-8 pr-3 rounded-md bg-secondary text-foreground border border-border text-xs focus:border-primary outline-none"
+              />
+            </div>
+            <select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              className="w-full h-7 px-2 rounded bg-secondary text-foreground border border-border text-xs outline-none"
+            >
+              <option value="">All Regions</option>
+              {regions.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          {/* Results */}
+          <div className="flex-1 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                No trusts found. <button type="button" className="text-primary hover:underline" onClick={() => { setSearch(''); setRegionFilter(''); }}>Clear filters</button>
+              </div>
+            ) : (
+              filtered.map((trust) => (
+                <button
+                  key={trust.name}
+                  type="button"
+                  onClick={() => { onChange(trust.name); setIsOpen(false); setSearch(''); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors border-b border-border/50 last:border-0 ${
+                    value === trust.name ? 'bg-primary/10 text-primary' : ''
+                  }`}
+                >
+                  <div className="font-medium text-xs">{trust.name}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] font-medium ${typeColor(trust.type)}`}>{typeLabel(trust.type)}</span>
+                    <span className="text-[10px] text-muted-foreground">{trust.region}</span>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="p-2 border-t border-border text-xs text-muted-foreground text-center">
+            {filtered.length} of {UK_TRUSTS.length} organizations
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        {value ? "You'll be the admin of this organization." : 'Select your NHS Trust, Health Board, or private hospital group.'}
+      </p>
     </div>
   );
 }
