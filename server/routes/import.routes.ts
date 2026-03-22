@@ -12,9 +12,83 @@ router.use(authorize('admin'));
 // POST /api/import/bulk - Import all CSV datasets
 router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { doctors, leaveRequests, doctorPreferences, historicalLoad, shiftTemplates, serviceRequirements } = req.body;
+    const { doctors, nurses, supportStaff, ahps, leaveRequests, doctorPreferences, historicalLoad, shiftTemplates, serviceRequirements } = req.body;
     const orgId = req.user?.organizationId || null;
     const results: Record<string, { imported: number; skipped: number; errors: string[] }> = {};
+
+    // Helper: import staff members (nurses, support workers, AHPs)
+    async function importStaffMembers(data: any[], category: string, defaultRole: string) {
+      const r = { imported: 0, skipped: 0, errors: [] as string[] };
+      for (const staff of data) {
+        try {
+          const name = [staff.title, staff.first_name, staff.last_name].filter(Boolean).join(' ').trim() || staff.name;
+          if (!name) { r.skipped++; continue; }
+
+          const code = staff.staff_id || staff.employee_id || null;
+          const staffData = {
+            organizationId: orgId,
+            registrationNumber: staff.registration_number || staff.nmc_number || staff.hcpc_number || null,
+            registrationBody: staff.registration_body || null,
+            title: staff.title || null,
+            name,
+            firstName: staff.first_name || null,
+            lastName: staff.last_name || null,
+            email: staff.email || staff.nhs_email || null,
+            clinicalRole: staff.clinical_role || defaultRole,
+            roleCategory: category,
+            band: staff.band || null,
+            grade: staff.grade || null,
+            specialty: staff.specialty || null,
+            department: staff.department || 'General',
+            site: staff.site || null,
+            contract: staff.contract || '100%',
+            contractHours: parseFloat(staff.contract_hours) || null,
+            fte: staff.fte || '1.0',
+            status: staff.employment_status || staff.status || 'Active',
+            maxHours: parseFloat(staff.max_weekly_hours) || 48.0,
+            canDoNights: staff.can_do_nights === '1' || staff.can_do_nights === 'true' || staff.can_do_nights === true,
+            canDoOncall: staff.can_do_oncall === '1' || staff.can_do_oncall === 'true' || staff.can_do_oncall === true,
+            skills: staff.skills || null,
+            trainingDay: staff.training_day || null,
+            employmentStart: staff.employment_start_date ? new Date(staff.employment_start_date) : null,
+            employmentEnd: staff.employment_end_date ? new Date(staff.employment_end_date) : null,
+          };
+
+          if (code) {
+            await prisma.staffMember.upsert({
+              where: { staffCode: code },
+              update: staffData,
+              create: { staffCode: code, ...staffData },
+            });
+          } else {
+            await prisma.staffMember.create({ data: staffData });
+          }
+          r.imported++;
+        } catch (err: any) {
+          r.errors.push(`${staff.staff_id || staff.name}: ${err.message}`);
+          r.skipped++;
+        }
+      }
+      return r;
+    }
+
+    // Import nurses
+    if (nurses && Array.isArray(nurses) && nurses.length > 0) {
+      results.nurses = await importStaffMembers(nurses, 'nursing', 'staff_nurse');
+      logger.info(`Imported ${results.nurses.imported} nurses`);
+    }
+
+    // Import support staff (HCAs, care workers, etc.)
+    if (supportStaff && Array.isArray(supportStaff) && supportStaff.length > 0) {
+      results.supportStaff = await importStaffMembers(supportStaff, 'support', 'hca');
+      logger.info(`Imported ${results.supportStaff.imported} support staff`);
+    }
+
+    // Import AHPs (physios, OTs, pharmacists, paramedics, etc.)
+    if (ahps && Array.isArray(ahps) && ahps.length > 0) {
+      results.ahps = await importStaffMembers(ahps, 'allied_health', 'physiotherapist');
+      logger.info(`Imported ${results.ahps.imported} AHPs`);
+    }
 
     // 1. Import doctors first (other tables reference doctor IDs)
     if (doctors && Array.isArray(doctors) && doctors.length > 0) {

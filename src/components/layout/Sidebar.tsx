@@ -13,15 +13,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
 
+  // Staff see: Dashboard, My Portal, Rota Board (view only), Settings
+  // Admins see: everything
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/app' },
-    { icon: CalendarRange, label: 'Rota Planning', path: '/app/planning' },
-    { icon: CalendarDays, label: 'Rota Board', path: '/app/rota' },
     { icon: UserCircle, label: 'My Portal', path: '/app/portal' },
-    { icon: MapIcon, label: 'Live Acuity', path: '/app/map' },
-    { icon: Users, label: 'Workforce', path: '/app/workforce' },
-    { icon: SettingsIcon, label: 'Rules Studio', path: '/app/rules' },
+    { icon: CalendarDays, label: 'Rota Board', path: '/app/rota' },
     ...(isAdmin ? [
+      { icon: CalendarRange, label: 'Rota Planning', path: '/app/planning' },
+      { icon: MapIcon, label: 'Live Acuity', path: '/app/map' },
+      { icon: Users, label: 'Workforce', path: '/app/workforce' },
+      { icon: SettingsIcon, label: 'Rules Studio', path: '/app/rules' },
       { icon: Inbox, label: 'Requests', path: '/app/requests' },
       { icon: UserPlus, label: 'Team', path: '/app/team' },
       { icon: Upload, label: 'Bulk Import', path: '/app/import' },

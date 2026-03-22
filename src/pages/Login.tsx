@@ -115,11 +115,11 @@ export function Login() {
               </button>
               <button
                 type="button"
-                onClick={() => { setEmail('sarah.smith@nhs.net'); setPassword('doctor123'); }}
+                onClick={() => { setEmail('doctor@rotaai.com'); setPassword('doctor123'); }}
                 className="text-xs px-3 py-2 bg-secondary rounded-md hover:bg-secondary/80 transition-colors text-center"
               >
-                <div className="font-medium">Doctor</div>
-                <div className="text-muted-foreground">sarah.smith@nhs.net</div>
+                <div className="font-medium">Staff</div>
+                <div className="text-muted-foreground">doctor@rotaai.com</div>
               </button>
             </div>
           </div>

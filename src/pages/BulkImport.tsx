@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Loader2, AlertTriangle, Users, Calendar, Settings2, Clock, Building2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Loader2, AlertTriangle, Users, Calendar, Settings2, Clock, Building2, Stethoscope, Heart } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { useAuthFetch } from '../contexts/AuthContext';
 
@@ -48,12 +48,15 @@ export function BulkImport() {
   const [importResults, setImportResults] = useState<any>(null);
 
   const [files, setFiles] = useState<FileSlot[]>([
-    { key: 'doctors', label: 'Doctors', description: 'Core workforce master data', icon: Users, required: true, expectedColumns: ['doctor_id', 'first_name', 'last_name', 'grade'], data: null, fileName: null },
-    { key: 'leaveRequests', label: 'Leave Requests', description: 'Annual/study/sick leave records', icon: Calendar, required: false, expectedColumns: ['leave_id', 'doctor_id', 'leave_type', 'start_date'], data: null, fileName: null },
-    { key: 'doctorPreferences', label: 'Doctor Preferences', description: 'Shift and fairness preferences', icon: Settings2, required: false, expectedColumns: ['doctor_id', 'preferred_shift', 'fairness_weight'], data: null, fileName: null },
-    { key: 'historicalLoad', label: 'Historical Load', description: 'YTD nights, weekends, on-calls', icon: Clock, required: false, expectedColumns: ['doctor_id', 'weekends_ytd', 'nights_ytd'], data: null, fileName: null },
+    { key: 'doctors', label: 'Doctors / Medical Staff', description: 'Consultants, registrars, SHOs, FY1/FY2, GPs, locums', icon: Stethoscope, required: false, expectedColumns: ['doctor_id', 'first_name', 'last_name', 'grade'], data: null, fileName: null },
+    { key: 'nurses', label: 'Nurses & Midwives', description: 'Staff nurses, sisters, ANPs, CNS, midwives, nursing associates', icon: Heart, required: false, expectedColumns: ['staff_id', 'first_name', 'last_name', 'clinical_role', 'band'], data: null, fileName: null },
+    { key: 'supportStaff', label: 'Support Workers & Care Staff', description: 'HCAs, care workers, nursing assistants, therapy assistants, porters', icon: Users, required: false, expectedColumns: ['staff_id', 'first_name', 'last_name', 'clinical_role', 'band'], data: null, fileName: null },
+    { key: 'ahps', label: 'Allied Health Professionals', description: 'Physios, OTs, SLTs, radiographers, ODPs, PAs, pharmacists, paramedics', icon: Users, required: false, expectedColumns: ['staff_id', 'first_name', 'last_name', 'clinical_role', 'registration_body'], data: null, fileName: null },
+    { key: 'leaveRequests', label: 'Leave Requests', description: 'Annual/study/sick leave for all staff', icon: Calendar, required: false, expectedColumns: ['leave_id', 'staff_id', 'leave_type', 'start_date'], data: null, fileName: null },
+    { key: 'doctorPreferences', label: 'Staff Preferences', description: 'Shift and fairness preferences for all roles', icon: Settings2, required: false, expectedColumns: ['staff_id', 'preferred_shift', 'fairness_weight'], data: null, fileName: null },
+    { key: 'historicalLoad', label: 'Historical Load', description: 'YTD nights, weekends, on-calls', icon: Clock, required: false, expectedColumns: ['staff_id', 'weekends_ytd', 'nights_ytd'], data: null, fileName: null },
     { key: 'shiftTemplates', label: 'Shift Templates', description: 'Standard shift type definitions', icon: FileSpreadsheet, required: false, expectedColumns: ['shift_template_id', 'shift_type', 'start_time'], data: null, fileName: null },
-    { key: 'serviceRequirements', label: 'Service Requirements', description: 'Minimum staffing by site/dept', icon: Building2, required: false, expectedColumns: ['site', 'specialty', 'department', 'shift_type'], data: null, fileName: null },
+    { key: 'serviceRequirements', label: 'Service Requirements', description: 'Minimum staffing by site/dept/role', icon: Building2, required: false, expectedColumns: ['site', 'specialty', 'department', 'shift_type'], data: null, fileName: null },
   ]);
 
   const handleFileClick = (key: string) => {
