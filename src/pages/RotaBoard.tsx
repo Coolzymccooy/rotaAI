@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { ChevronLeft, ChevronRight, Filter, Zap, PoundSterling, TrendingDown, AlertCircle, Clock, UserX, Loader2, GripVertical, Download, Share2, Lock, Unlock, Printer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Zap, PoundSterling, TrendingDown, AlertCircle, Clock, UserX, Loader2, GripVertical, Download, Share2, Lock, Unlock, Printer, Search } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { useAuthFetch, useAuth } from '../contexts/AuthContext';
@@ -116,6 +116,8 @@ export function RotaBoard() {
   const [editFormData, setEditFormData] = useState({ type: 'Day', time: '08:00 - 20:00' });
 
   // Rota filters
+  const [rotaSearch, setRotaSearch] = useState('');
+  const [rotaSearchInput, setRotaSearchInput] = useState('');
   const [rotaDept, setRotaDept] = useState('');
   const [rotaGrade, setRotaGrade] = useState('');
   const [rotaSite, setRotaSite] = useState('');
@@ -142,6 +144,7 @@ export function RotaBoard() {
       const params = new URLSearchParams();
       params.set('page', String(rotaPage));
       params.set('limit', String(ROTA_PAGE_SIZE));
+      if (rotaSearch) params.set('search', rotaSearch);
       if (rotaDept) params.set('department', rotaDept);
       if (rotaGrade) params.set('grade', rotaGrade);
       if (rotaSite) params.set('site', rotaSite);
@@ -179,15 +182,21 @@ export function RotaBoard() {
     }
   };
 
+  // Debounced search
+  useEffect(() => {
+    const t = setTimeout(() => setRotaSearch(rotaSearchInput), 400);
+    return () => clearTimeout(t);
+  }, [rotaSearchInput]);
+
   // Reset to page 1 when filters change
-  useEffect(() => { setRotaPage(1); }, [rotaDept, rotaGrade, rotaSite]);
+  useEffect(() => { setRotaPage(1); }, [rotaDept, rotaGrade, rotaSite, rotaSearch]);
 
   useEffect(() => {
     fetchData();
     const handler = () => fetchData();
     window.addEventListener('rota-updated', handler);
     return () => window.removeEventListener('rota-updated', handler);
-  }, [rotaPage, rotaDept, rotaGrade, rotaSite]);
+  }, [rotaPage, rotaDept, rotaGrade, rotaSite, rotaSearch]);
 
   const getShift = (docId: string, dayIdx: number) => {
     return dbShifts.find((s: any) => (s.docId === docId || s.doctorId === docId) && s.dayIdx === dayIdx);
@@ -528,6 +537,16 @@ export function RotaBoard() {
 
       {/* Filter & Pagination Bar */}
       <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={rotaSearchInput}
+            onChange={(e) => setRotaSearchInput(e.target.value)}
+            placeholder="Search by name, code, email..."
+            className="h-8 pl-7 pr-3 w-52 rounded-md bg-secondary text-foreground border border-border text-xs focus:border-primary outline-none"
+          />
+        </div>
         <select value={rotaDept} onChange={(e) => setRotaDept(e.target.value)}
           className="h-8 px-2 rounded-md bg-secondary text-foreground border border-border text-xs focus:border-primary outline-none appearance-none">
           <option value="">All Departments</option>
@@ -543,8 +562,8 @@ export function RotaBoard() {
           <option value="">All Sites</option>
           {filterOptions.sites?.map((s: string) => <option key={s} value={s}>{s}</option>)}
         </select>
-        {(rotaDept || rotaGrade || rotaSite) && (
-          <button onClick={() => { setRotaDept(''); setRotaGrade(''); setRotaSite(''); }} className="text-xs text-destructive hover:underline">Clear</button>
+        {(rotaDept || rotaGrade || rotaSite || rotaSearch) && (
+          <button onClick={() => { setRotaDept(''); setRotaGrade(''); setRotaSite(''); setRotaSearchInput(''); }} className="text-xs text-destructive hover:underline">Clear all</button>
         )}
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" disabled={rotaPage <= 1} onClick={() => setRotaPage(p => p - 1)}><ChevronLeft className="w-4 h-4" /></Button>
