@@ -474,8 +474,9 @@ model StaffMember {
   firstName         String?
   lastName          String?
   email             String?
-  clinicalRole      String   // "doctor", "nurse", "anp", "pa", "pharmacist", "hca", "midwife", "ot", "physio", "paramedic"
-  band              String?  // NHS pay band: "Band 5", "Band 6", "Band 7", "Band 8a", etc.
+  clinicalRole      String   // See CLINICAL_ROLES reference data for full list (50+ roles)
+  roleCategory      String?  // "medical", "nursing", "allied_health", "support", "admin", "emergency"
+  band              String?  // NHS pay band: "Band 1" to "Band 9", "Medical" for doctors
   grade             String?  // "Consultant", "Registrar", "Staff Nurse", "Senior Sister", etc.
   specialty         String?
   department        String   @default("General")
