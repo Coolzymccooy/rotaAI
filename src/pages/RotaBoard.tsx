@@ -86,8 +86,20 @@ function DraggableShiftCell({ shift, doc, dayLabel, onClick }: {
   );
 }
 
+type PlanningPeriod = '1week' | '2weeks' | '1month' | '3months' | '6months' | '1year';
+
+const PERIOD_OPTIONS: { value: PlanningPeriod; label: string; days: number }[] = [
+  { value: '1week', label: '1 Week', days: 7 },
+  { value: '2weeks', label: '2 Weeks', days: 14 },
+  { value: '1month', label: '1 Month', days: 28 },
+  { value: '3months', label: '3 Months', days: 91 },
+  { value: '6months', label: '6 Months', days: 182 },
+  { value: '1year', label: '1 Year', days: 364 },
+];
+
 export function RotaBoard() {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [planningPeriod, setPlanningPeriod] = useState<PlanningPeriod>('1week');
   const [weekOffset, setWeekOffset] = useState(0);
   const [dayOffset, setDayOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -246,7 +258,7 @@ export function RotaBoard() {
         method: 'POST',
         body: JSON.stringify({
           startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date(Date.now() + (PERIOD_OPTIONS.find(p => p.value === planningPeriod)?.days || 7) * 24 * 60 * 60 * 1000).toISOString(),
           rules: {},
           mode: optimizeMode,
           department: optimizeMode === 'partial' ? rotaDept : undefined,
@@ -660,8 +672,27 @@ export function RotaBoard() {
       {/* Optimization Modal */}
       <Modal isOpen={isSimModalOpen} onClose={() => setIsSimModalOpen(false)} title="Optimization Engine">
         <div className="space-y-4 py-4">
-          <p className="text-sm text-muted-foreground">Choose how to optimize the rota:</p>
+          {/* Planning period selector */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Rota Period</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {PERIOD_OPTIONS.map((p) => (
+                <button key={p.value} type="button" onClick={() => setPlanningPeriod(p.value)}
+                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    planningPeriod === p.value ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Generates shifts for {PERIOD_OPTIONS.find(p => p.value === planningPeriod)?.days} days from today
+            </p>
+          </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Optimization Mode</label>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {[
               { mode: 'full', label: 'Full Rebuild', desc: 'Wipe and regenerate entire rota', color: 'border-destructive/30 bg-destructive/5' },
