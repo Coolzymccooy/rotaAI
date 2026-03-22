@@ -46,10 +46,12 @@ function getMonthDays(offset: number): { labels: string[]; dates: Date[]; monthL
   const dates: Date[] = [];
   const labels: string[] = [];
 
+  const SHORT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   for (let i = 1; i <= daysInMonth; i++) {
     const d = new Date(month.getFullYear(), month.getMonth(), i);
     dates.push(d);
-    labels.push(`${i}`);
+    const dayName = SHORT_DAYS[(d.getDay() + 6) % 7]; // Mon=0
+    labels.push(`${dayName} ${i}`);
   }
 
   const monthLabel = month.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
