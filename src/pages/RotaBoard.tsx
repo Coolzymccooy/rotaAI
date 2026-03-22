@@ -110,6 +110,7 @@ export function RotaBoard() {
   const [recoveryCandidate, setRecoveryCandidate] = useState<any>(null);
   const [isRecovering, setIsRecovering] = useState(false);
   const [isRotaLocked, setIsRotaLocked] = useState(false);
+  const [optimizeMode, setOptimizeMode] = useState<'full' | 'partial' | 'repair'>('full');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<any>(null);
   const [editFormData, setEditFormData] = useState({ type: 'Day', time: '08:00 - 20:00' });
@@ -238,12 +239,17 @@ export function RotaBoard() {
           startDate: new Date().toISOString(),
           endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           rules: {},
+          mode: optimizeMode,
+          department: optimizeMode === 'partial' ? rotaDept : undefined,
+          grade: optimizeMode === 'partial' ? rotaGrade : undefined,
+          site: optimizeMode === 'partial' ? rotaSite : undefined,
         }),
       });
 
       const data = await response.json();
       if (data.success) {
-        addToast('Optimization applied successfully!', 'success');
+        const result = data.data;
+        addToast(`${optimizeMode === 'repair' ? 'Repaired' : 'Generated'}: ${result.shifts?.length || 0} shifts (fairness: ${result.fairnessScore})`, 'success');
         setIsSimModalOpen(false);
         fetchData();
       } else {
@@ -633,33 +639,47 @@ export function RotaBoard() {
       </DndContext>
 
       {/* Optimization Modal */}
-      <Modal isOpen={isSimModalOpen} onClose={() => setIsSimModalOpen(false)} title="Optimization Simulator">
+      <Modal isOpen={isSimModalOpen} onClose={() => setIsSimModalOpen(false)} title="Optimization Engine">
         <div className="space-y-4 py-4">
-          <p className="text-sm text-muted-foreground">
-            The AI engine has found a more optimal schedule. Here is the projected impact:
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg border border-border p-4 bg-secondary/50">
-              <div className="text-sm font-medium text-muted-foreground mb-1">Rule Violations</div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-destructive line-through opacity-50">3</span>
-                <span className="text-2xl font-bold text-emerald-500">0</span>
-              </div>
-            </div>
-            <div className="rounded-lg border border-border p-4 bg-secondary/50">
-              <div className="text-sm font-medium text-muted-foreground mb-1">Locum Spend</div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-destructive line-through opacity-50">&pound;1,020</span>
-                <span className="text-2xl font-bold text-emerald-500">&pound;0</span>
-              </div>
-            </div>
+          <p className="text-sm text-muted-foreground">Choose how to optimize the rota:</p>
+
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { mode: 'full', label: 'Full Rebuild', desc: 'Wipe and regenerate entire rota', color: 'border-destructive/30 bg-destructive/5' },
+              { mode: 'partial', label: 'Partial Regen', desc: 'Only regenerate current filter', color: 'border-amber-500/30 bg-amber-500/5' },
+              { mode: 'repair', label: 'Repair Gaps', desc: 'Fill uncovered slots only', color: 'border-emerald-500/30 bg-emerald-500/5' },
+            ].map((m) => (
+              <button key={m.mode} type="button" onClick={() => setOptimizeMode(m.mode as any)}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  optimizeMode === m.mode ? 'ring-2 ring-primary ' + m.color : 'border-border hover:bg-secondary'
+                }`}>
+                <div className="text-xs font-semibold">{m.label}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">{m.desc}</div>
+              </button>
+            ))}
           </div>
+
+          {optimizeMode === 'partial' && (rotaDept || rotaGrade || rotaSite) && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs">
+              <p className="font-medium text-amber-600 dark:text-amber-400">Partial mode will only regenerate shifts for:</p>
+              <p className="mt-1 text-muted-foreground">
+                {[rotaDept && `Department: ${rotaDept}`, rotaGrade && `Grade: ${rotaGrade}`, rotaSite && `Site: ${rotaSite}`].filter(Boolean).join(' | ') || 'All (set filters above to narrow scope)'}
+              </p>
+            </div>
+          )}
+
+          {optimizeMode === 'repair' && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs">
+              <p className="font-medium text-emerald-600 dark:text-emerald-400">Repair mode preserves existing shifts</p>
+              <p className="mt-1 text-muted-foreground">Only adds new shifts to fill gaps. No existing assignments will change.</p>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => setIsSimModalOpen(false)}>Cancel</Button>
           <Button onClick={handleApplyChanges} disabled={isSaving}>
-            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Apply Changes
+            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-1" />}
+            {optimizeMode === 'full' ? 'Full Rebuild' : optimizeMode === 'partial' ? 'Partial Regen' : 'Repair Gaps'}
           </Button>
         </div>
       </Modal>

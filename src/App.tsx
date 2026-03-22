@@ -16,6 +16,7 @@ import { Integrations } from './pages/Integrations';
 import { Team } from './pages/Team';
 import { RotaPlanning } from './pages/RotaPlanning';
 import { MyPortal } from './pages/MyPortal';
+import { RequestReview } from './pages/RequestReview';
 import { ToastProvider } from './components/ui/Toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -53,6 +54,7 @@ export default function App() {
                   <Route path="team" element={<Team />} />
                   <Route path="planning" element={<RotaPlanning />} />
                   <Route path="portal" element={<MyPortal />} />
+                  <Route path="requests" element={<RequestReview />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
