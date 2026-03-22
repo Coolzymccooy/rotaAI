@@ -53,11 +53,33 @@ export function Header({ onToggleAI, isAIOpen, onToggleSidebar }: HeaderProps) {
     if (e.key === 'Escape') setShowResults(false);
   };
 
-  const notifications = [
-    { id: 1, text: 'Dr. Lisa Taylor has critical fatigue', type: 'warning', action: () => navigate('/app/workforce') },
-    { id: 2, text: 'New leave request pending review', type: 'info', action: () => navigate('/app/workforce') },
-    { id: 3, text: '1 EWTD violation detected on Rota Board', type: 'error', action: () => navigate('/app/rota') },
-  ];
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch real notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await authFetch('/api/approvals/notifications');
+        const data = await res.json();
+        if (data.success) {
+          setNotifications(data.data.notifications || []);
+          setUnreadCount(data.data.unreadCount || 0);
+        }
+      } catch {}
+    };
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await authFetch('/api/approvals/notifications/read-all', { method: 'POST' });
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch {}
+  };
 
   return (
     <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
@@ -133,27 +155,51 @@ export function Header({ onToggleAI, isAIOpen, onToggleSidebar }: HeaderProps) {
             className="relative p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground rounded-full text-[10px] font-bold flex items-center justify-center px-1">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 top-full mt-1 w-80 bg-card border border-border rounded-lg shadow-lg z-50">
-              <div className="p-3 border-b border-border">
-                <h4 className="text-sm font-semibold">Notifications</h4>
+              <div className="p-3 border-b border-border flex items-center justify-between">
+                <h4 className="text-sm font-semibold">Notifications {unreadCount > 0 && `(${unreadCount})`}</h4>
+                {unreadCount > 0 && (
+                  <button onClick={handleMarkAllRead} className="text-xs text-primary hover:underline">Mark all read</button>
+                )}
               </div>
               <div className="max-h-64 overflow-y-auto">
-                {notifications.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => { n.action(); setShowNotifications(false); }}
-                    className="w-full text-left px-4 py-3 text-sm hover:bg-secondary transition-colors border-b border-border last:border-0"
-                  >
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                      n.type === 'error' ? 'bg-destructive' : n.type === 'warning' ? 'bg-amber-500' : 'bg-primary'
-                    }`} />
-                    {n.text}
-                  </button>
-                ))}
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">No notifications</div>
+                ) : (
+                  notifications.map((n: any) => (
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        if (n.link) navigate(n.link);
+                        setShowNotifications(false);
+                        if (!n.isRead) {
+                          authFetch(`/api/approvals/notifications/${n.id}/read`, { method: 'PATCH' });
+                          setUnreadCount(prev => Math.max(0, prev - 1));
+                        }
+                      }}
+                      className={`w-full text-left px-4 py-3 text-sm hover:bg-secondary transition-colors border-b border-border last:border-0 ${
+                        !n.isRead ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />}
+                        <div>
+                          <p className={`text-xs ${!n.isRead ? 'font-medium' : 'text-muted-foreground'}`}>{n.title}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{n.message?.slice(0, 80)}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           )}

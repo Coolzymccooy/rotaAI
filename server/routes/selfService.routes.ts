@@ -9,6 +9,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/db.js';
 import { protect, authorize } from '../middlewares/auth.middleware.js';
 import * as auditService from '../services/audit.service.js';
+import * as approvalService from '../services/approval.service.js';
 
 const router = Router();
 router.use(protect);
@@ -106,17 +107,19 @@ router.post('/requests', async (req: Request, res: Response, next: NextFunction)
       return res.status(400).json({ success: false, message: 'doctorId is required' });
     }
 
-    // Auto-approve rules
-    let autoApprovable = false;
-    let status = 'pending';
+    // Evaluate approval chain
+    const durationDays = (startDate && endDate)
+      ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
 
-    // Short leave (1-2 days) can be auto-flagged
-    if (type === 'leave' && startDate && endDate) {
-      const days = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
-      if (days <= 2 && subType !== 'annual') {
-        autoApprovable = true;
-      }
-    }
+    const decision = await approvalService.evaluateApproval(
+      req.user?.organizationId || null,
+      type,
+      { durationDays, subType, urgency: priority }
+    );
+
+    const autoApprovable = decision.autoApproved;
+    const status = decision.autoApproved ? 'approved' : 'pending';
 
     const request = await prisma.staffRequest.create({
       data: {
@@ -188,6 +191,20 @@ router.patch('/requests/:id/review', authorize('admin'), async (req: Request, re
       entityId: request.id,
       details: { status, reviewNote },
     });
+
+    // Notify the requesting doctor
+    const requestingUser = await prisma.user.findFirst({ where: { doctorId: request.doctorId } });
+    if (requestingUser) {
+      await approvalService.notifyUser(
+        requestingUser.id,
+        status === 'approved' ? 'request_approved' : 'request_rejected',
+        `Request ${status}: ${request.title}`,
+        status === 'approved'
+          ? `Your ${request.type} request "${request.title}" has been approved.`
+          : `Your ${request.type} request "${request.title}" was rejected.${reviewNote ? ` Reason: ${reviewNote}` : ''}`,
+        '/app/portal'
+      );
+    }
 
     res.json({ success: true, data: request });
   } catch (error) { next(error); }

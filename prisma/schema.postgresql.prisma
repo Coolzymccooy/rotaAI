@@ -36,6 +36,8 @@ model Organization {
   rotaPeriods RotaPeriod[]
   staffRequests StaffRequest[]
   staffMembers StaffMember[]
+  locumRequests LocumRequest[]
+  approvalRules ApprovalRule[]
 }
 
 model Invite {
@@ -276,6 +278,72 @@ model StaffRequest {
 
   doctor          Doctor    @relation("StaffRequests", fields: [doctorId], references: [id])
   organization    Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================
+// LOCUM / AGENCY REQUESTS
+// ============================================
+
+model LocumRequest {
+  id              String    @id @default(uuid())
+  organizationId  String?
+  shiftId         String?   // The unfilled shift that triggered this
+  department      String
+  grade           String    // Required grade: "Registrar", "Consultant", etc.
+  shiftType       String    // "Day", "Night", "Long Day", "Weekend"
+  shiftDate       DateTime
+  shiftTime       String    // "08:00 - 20:00"
+  reason          String    // "sick_cover", "vacancy", "surge", "leave_cover"
+  estimatedCost   Float?    // Projected cost in £
+  hourlyRate      Float     @default(80)
+  hours           Float     @default(12)
+  urgency         String    @default("normal") // "low", "normal", "urgent", "emergency"
+  status          String    @default("pending") // "pending", "budget_review", "approved", "filled", "rejected", "cancelled"
+  requestedBy     String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  agencyName      String?   // Which agency fills it
+  locumName       String?   // Name of assigned locum
+  filledAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================
+// APPROVAL CHAINS
+// ============================================
+
+model ApprovalRule {
+  id              String  @id @default(uuid())
+  organizationId  String?
+  requestType     String  // "leave", "locum", "swap", "rota_override", "budget"
+  condition       String  // JSON: e.g., {"maxDays": 2} or {"maxCost": 1000}
+  approvalLevel   Int     @default(1) // 1 = auto/line manager, 2 = dept head, 3 = director
+  approverRole    String  // "auto", "line_manager", "department_lead", "admin", "finance"
+  isActive        Boolean @default(true)
+  description     String?
+  createdAt       DateTime @default(now())
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id              String    @id @default(uuid())
+  userId          String
+  type            String    // "request_approved", "request_rejected", "shift_change", "locum_needed", "swap_request", "rota_published"
+  title           String
+  message         String
+  link            String?   // URL path to navigate to, e.g., "/app/portal"
+  isRead          Boolean   @default(false)
+  readAt          DateTime?
+  createdAt       DateTime  @default(now())
 }
 
 model Leave {

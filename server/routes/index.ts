@@ -16,6 +16,7 @@ import rotaPeriodRoutes from './rotaPeriod.routes.js';
 import selfServiceRoutes from './selfService.routes.js';
 import complianceRoutes from './compliance.routes.js';
 import fhirTestRoutes from './fhirTest.routes.js';
+import approvalRoutes from './approval.routes.js';
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use('/rota-periods', rotaPeriodRoutes);
 router.use('/self-service', selfServiceRoutes);
 router.use('/compliance', complianceRoutes);
 router.use('/fhir-test', fhirTestRoutes);
+router.use('/approvals', approvalRoutes);
 
 export default router;
