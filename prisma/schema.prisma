@@ -33,6 +33,8 @@ model Organization {
   serviceRequirements ServiceRequirement[]
   wardStates  WardState[]
   auditLogs   AuditLog[]
+  rotaPeriods RotaPeriod[]
+  staffRequests StaffRequest[]
 }
 
 model Invite {
@@ -117,6 +119,8 @@ model Doctor {
   leaveRequests     LeaveRequest[]
   preferences       DoctorPreference?
   historicalLoad    HistoricalLoad?
+  availability      Availability[]
+  staffRequests     StaffRequest[]   @relation("StaffRequests")
 }
 
 model DoctorPreference {
@@ -195,6 +199,70 @@ model Shift {
   organization   Organization? @relation(fields: [organizationId], references: [id])
   doctor         Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   swaps          ShiftSwap[]
+}
+
+// ============================================
+// MULTI-HORIZON PLANNING
+// ============================================
+
+model RotaPeriod {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  name            String   // e.g., "Q1 2026 Rota", "March 2026 Weekly"
+  mode            String   // "annual", "quarterly", "monthly", "weekly", "live"
+  status          String   @default("draft") // "draft", "published", "locked", "archived"
+  startDate       DateTime
+  endDate         DateTime
+  createdBy       String?
+  publishedAt     DateTime?
+  publishedBy     String?
+  lockedAt        DateTime?
+  notes           String?
+  optimizationProfile String? // JSON: fairnessWeight, costWeight, priorities
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model Availability {
+  id              String   @id @default(uuid())
+  doctorId        String
+  type            String   // "unavailable", "preferred_off", "preferred_on", "restriction"
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  isRecurring     Boolean  @default(false)
+  recurringDay    String?  // "Monday", "Tuesday", etc. for recurring weekly blocks
+  status          String   @default("active") // "active", "expired", "cancelled"
+  createdAt       DateTime @default(now())
+
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model StaffRequest {
+  id              String    @id @default(uuid())
+  organizationId  String?
+  doctorId        String
+  type            String    // "leave", "swap", "preference", "restriction", "shift_offer"
+  subType         String?   // "annual", "study", "sick", "compassionate", "night_opt_out", etc.
+  title           String
+  description     String?
+  startDate       DateTime?
+  endDate         DateTime?
+  targetDoctorId  String?   // For swaps
+  targetShiftId   String?   // For swaps
+  priority        String    @default("normal") // "low", "normal", "high", "urgent"
+  status          String    @default("pending") // "pending", "approved", "rejected", "cancelled"
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  autoApprovable  Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  doctor          Doctor    @relation("StaffRequests", fields: [doctorId], references: [id])
+  organization    Organization? @relation(fields: [organizationId], references: [id])
 }
 
 model Leave {

@@ -12,6 +12,8 @@ import searchRoutes from './search.routes.js';
 import wardRoutes from './ward.routes.js';
 import importRoutes from './import.routes.js';
 import integrationRoutes from './integration.routes.js';
+import rotaPeriodRoutes from './rotaPeriod.routes.js';
+import selfServiceRoutes from './selfService.routes.js';
 
 const router = Router();
 
@@ -33,5 +35,7 @@ router.use('/audit', auditRoutes);
 router.use('/search', searchRoutes);
 router.use('/wards', wardRoutes);
 router.use('/import', importRoutes);
+router.use('/rota-periods', rotaPeriodRoutes);
+router.use('/self-service', selfServiceRoutes);
 
 export default router;
