@@ -15,6 +15,9 @@ interface GenerateOptions {
   // For repair mode — only fill gaps around these
   targetDoctorId?: string;
   targetDayIdx?: number;
+  // For scoped regeneration — only affect shifts within this day range
+  startDayIdx?: number;
+  endDayIdx?: number;
 }
 
 /**
@@ -91,13 +94,20 @@ export const generateRota = async (options: GenerateOptions) => {
   const result = await callOptimizationEngine(payload);
 
   // Delete strategy depends on mode
+  const deleteWhere: any = { ...where };
+
+  // Scope deletion to specific day range if provided
+  if (options.startDayIdx !== undefined && options.endDayIdx !== undefined) {
+    deleteWhere.dayIdx = { gte: options.startDayIdx, lte: options.endDayIdx };
+    logger.warn(`Scoped to days ${options.startDayIdx}-${options.endDayIdx}`);
+  }
+
   if (mode === 'full') {
-    await prisma.shift.deleteMany({ where });
+    await prisma.shift.deleteMany({ where: deleteWhere });
   } else if (mode === 'partial') {
-    // Only delete shifts for the affected doctors
     const doctorIds = doctors.map(d => d.id);
     await prisma.shift.deleteMany({
-      where: { ...where, doctorId: { in: doctorIds } },
+      where: { ...deleteWhere, doctorId: { in: doctorIds } },
     });
   }
   // Repair mode: don't delete anything — only add new shifts for gaps

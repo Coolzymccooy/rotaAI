@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, LayoutDashboard, Settings as SettingsIcon, Users, Stethoscope, Map as MapIcon, ClipboardList, LogOut, X, Upload, Cog, Plug, UserPlus, CalendarRange, UserCircle, Inbox, Shield, BarChart3 } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Settings as SettingsIcon, Users, Stethoscope, Map as MapIcon, ClipboardList, LogOut, X, Upload, Cog, Plug, UserPlus, CalendarRange, UserCircle, Inbox, Shield, BarChart3, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,6 +23,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       { icon: CalendarRange, label: 'Rota Planning', path: '/app/planning' },
       { icon: MapIcon, label: 'Live Acuity', path: '/app/map' },
       { icon: Users, label: 'Workforce', path: '/app/workforce' },
+      { icon: Activity, label: 'Workforce State', path: '/app/state' },
       { icon: SettingsIcon, label: 'Rules Studio', path: '/app/rules' },
       { icon: BarChart3, label: 'Analytics', path: '/app/analytics' },
       { icon: Inbox, label: 'Requests', path: '/app/requests' },
