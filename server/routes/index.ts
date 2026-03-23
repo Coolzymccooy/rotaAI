@@ -17,6 +17,8 @@ import selfServiceRoutes from './selfService.routes.js';
 import complianceRoutes from './compliance.routes.js';
 import fhirTestRoutes from './fhirTest.routes.js';
 import approvalRoutes from './approval.routes.js';
+import exportRoutes from './export.routes.js';
+import webhookRoutes from './webhook.routes.js';
 
 const router = Router();
 
@@ -43,5 +45,7 @@ router.use('/self-service', selfServiceRoutes);
 router.use('/compliance', complianceRoutes);
 router.use('/fhir-test', fhirTestRoutes);
 router.use('/approvals', approvalRoutes);
+router.use('/export', exportRoutes);
+router.use('/webhooks', webhookRoutes);
 
 export default router;

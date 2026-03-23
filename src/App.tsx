@@ -18,6 +18,7 @@ import { RotaPlanning } from './pages/RotaPlanning';
 import { MyPortal } from './pages/MyPortal';
 import { RequestReview } from './pages/RequestReview';
 import { Compliance } from './pages/Compliance';
+import { Analytics } from './pages/Analytics';
 import { ToastProvider } from './components/ui/Toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -57,6 +58,7 @@ export default function App() {
                   <Route path="portal" element={<MyPortal />} />
                   <Route path="requests" element={<RequestReview />} />
                   <Route path="compliance" element={<Compliance />} />
+                  <Route path="analytics" element={<Analytics />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
